@@ -119,7 +119,6 @@ function SectionLabel({ index, name }: { index: string; name: string }) {
 const LINKS = [
   { label: "Frames", href: "#frames" },
   { label: "Controls", href: "#control" },
-  { label: "On device", href: "#device" },
 ];
 
 function Nav() {
@@ -360,133 +359,64 @@ function FrameSlot({
   );
 }
 
-/* ====================== INTERACTIVE TIMELINE ====================== *
- *  The hero proof: "you pick the frames." A real range instrument.  *
- * ================================================================= */
+/* ========================= HERO RESULT ========================= *
+ *  The hero visual: one finished long exposure, framed as the     *
+ *  output of a clip. A top readout names the video source ("from  *
+ *  N frames") so it reads as motion → stillness, not a still      *
+ *  photo. Placeholder until a real exported exposure is dropped in.*
+ * ============================================================== */
 
-const FRAMES = 32;
-
-function FrameSelector() {
-  const [range, setRange] = useState<[number, number]>([7, 23]);
-  const trackRef = useRef<HTMLDivElement | null>(null);
-  const drag = useRef<null | "lo" | "hi">(null);
-
-  useEffect(() => {
-    const frameAt = (clientX: number) => {
-      const el = trackRef.current;
-      if (!el) return 0;
-      const r = el.getBoundingClientRect();
-      const t = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
-      return Math.round(t * (FRAMES - 1));
-    };
-    const move = (e: PointerEvent) => {
-      if (!drag.current) return;
-      const f = frameAt(e.clientX);
-      setRange(([lo, hi]) => (drag.current === "lo" ? [Math.min(f, hi - 1), hi] : [lo, Math.max(f, lo + 1)]));
-    };
-    const up = () => (drag.current = null);
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    return () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-  }, []);
-
-  const onKey = (side: "lo" | "hi") => (e: React.KeyboardEvent) => {
-    const delta = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
-    if (!delta) return;
-    e.preventDefault();
-    setRange(([lo, hi]) =>
-      side === "lo" ? [Math.min(Math.max(0, lo + delta), hi - 1), hi] : [lo, Math.max(Math.min(FRAMES - 1, hi + delta), lo + 1)]
-    );
-  };
-
-  const count = range[1] - range[0] + 1;
-
+function HeroResult({
+  src,
+  alt,
+  frames,
+  exposure,
+}: {
+  src?: string;
+  alt: string;
+  frames: number;
+  exposure: string;
+}) {
   return (
-    <div className="border border-line bg-panel">
-      {/* header readout */}
-      <div className="flex items-center justify-between border-b border-line px-4 py-2.5 sm:px-5">
-        <Mono className="text-ink-3">Frame range</Mono>
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-mono text-lg font-medium tabular-nums text-signal-soft">
-            {String(count).padStart(2, "0")}
-          </span>
+    <figure className="group relative overflow-hidden border border-line bg-panel-2">
+      {/* readout bar — the "clip → exposure" provenance */}
+      <figcaption className="flex items-center justify-between border-b border-line bg-panel px-4 py-2.5 sm:px-5">
+        <span className="flex items-center gap-2">
+          <Glyph d="M4 7 a2 2 0 0 1 2 -2 h8 a2 2 0 0 1 2 2 v10 a2 2 0 0 1 -2 2 H6 a2 2 0 0 1 -2 -2 Z M18 9 L21 7 V17 L18 15" className="h-4 w-4 text-ink-3" />
+          <Mono className="text-ink-3">Live Photo</Mono>
+        </span>
+        <Glyph d="M5 12 H17 M17 12 L13 8 M17 12 L13 16" className="h-4 w-7 text-signal/70" />
+        <span className="flex items-baseline gap-1.5">
+          <span className="font-mono text-base font-medium tabular-nums text-signal-soft">{frames}</span>
           <Mono className="text-ink-3">frames blended</Mono>
-        </div>
-      </div>
+        </span>
+      </figcaption>
 
-      <div className="px-4 py-6 sm:px-5">
-        <div ref={trackRef} className="relative h-20 w-full touch-none select-none">
-          {/* frame bars */}
-          <div className="absolute inset-0 flex items-end gap-[2px]">
-            {Array.from({ length: FRAMES }).map((_, i) => {
-              const on = i >= range[0] && i <= range[1];
-              const h = 30 + Math.abs(Math.sin(i * 1.7)) * 60; // pseudo-waveform
-              return (
-                <div
-                  key={i}
-                  className="flex-1 transition-colors duration-300"
-                  style={{
-                    height: `${on ? h : h * 0.55}%`,
-                    transitionTimingFunction: EASE,
-                    backgroundColor: on ? "var(--color-signal)" : "var(--color-line-bright)",
-                    opacity: on ? 0.9 : 0.6,
-                  }}
-                />
-              );
-            })}
+      <div className="relative" style={{ aspectRatio: "3 / 4" }}>
+        {src ? (
+          <img
+            src={src}
+            alt={alt}
+            className="h-full w-full object-cover transition-transform duration-[1400ms] group-hover:scale-[1.03]"
+            style={{ transitionTimingFunction: EASE }}
+          />
+        ) : (
+          /* honest placeholder — clearly a slot awaiting a real exposure */
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-base text-ink-3">
+            <div className="absolute inset-0 ticks opacity-25" />
+            <div className="pointer-events-none absolute inset-3 border border-dashed border-line-bright" />
+            <Glyph d="M4 8 L7 8 L8.5 5.5 L15.5 5.5 L17 8 L20 8 V18 H4 Z M12 12.5 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0" className="relative h-8 w-8" />
+            <Mono className="relative">Finished exposure</Mono>
+            <span className="relative max-w-[22ch] text-center text-[12px] leading-snug text-ink-3">{alt}</span>
           </div>
+        )}
 
-          {/* dimming scrims over excluded frames */}
-          <div className="pointer-events-none absolute inset-y-0 left-0 bg-base/55" style={{ width: `${(range[0] / FRAMES) * 100}%` }} />
-          <div className="pointer-events-none absolute inset-y-0 right-0 bg-base/55" style={{ width: `${((FRAMES - 1 - range[1]) / FRAMES) * 100}%` }} />
-
-          {/* handles */}
-          {(["lo", "hi"] as const).map((side) => {
-            const idx = side === "lo" ? range[0] : range[1];
-            const pct = side === "lo" ? (idx / FRAMES) * 100 : ((idx + 1) / FRAMES) * 100;
-            return (
-              <button
-                key={side}
-                role="slider"
-                aria-label={side === "lo" ? "First frame" : "Last frame"}
-                aria-valuemin={0}
-                aria-valuemax={FRAMES - 1}
-                aria-valuenow={idx}
-                tabIndex={0}
-                onKeyDown={onKey(side)}
-                onPointerDown={(e) => {
-                  (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-                  drag.current = side;
-                }}
-                className="absolute top-0 z-10 flex h-full w-4 -translate-x-1/2 cursor-ew-resize items-center justify-center bg-ink outline-none ring-signal-soft transition-transform duration-150 focus-visible:ring-2 active:scale-y-95"
-                style={{ left: `${pct}%` }}
-              >
-                <span className="flex flex-col gap-[3px]">
-                  <span className="h-px w-2 bg-base/40" />
-                  <span className="h-px w-2 bg-base/40" />
-                  <span className="h-px w-2 bg-base/40" />
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ruler */}
-        <div className="mt-3 flex items-center justify-between font-mono text-[10px] tabular-nums text-ink-3">
-          <span>00</span>
-          <span>{String(Math.floor(FRAMES / 2)).padStart(2, "0")}</span>
-          <span>{FRAMES - 1}</span>
-        </div>
+        {/* exposure stamp, bottom corner */}
+        <span className="pointer-events-none absolute bottom-3 right-3 bg-base/70 px-2 py-1 backdrop-blur-sm">
+          <Mono className="tabular-nums text-ink-2">{exposure}</Mono>
+        </span>
       </div>
-
-      <p className="border-t border-line px-4 py-3 text-[13px] text-ink-2 sm:px-5">
-        Drag the jaws. Only the frames inside blend — the rest are dropped. The composite
-        re-renders live, exactly like the timeline inside the app.
-      </p>
-    </div>
+    </figure>
   );
 }
 
@@ -587,7 +517,7 @@ export function LandingPage() {
       <main>
         {/* ============ HERO ============ */}
         <section className="mx-auto max-w-7xl px-5 pt-28 sm:px-8 sm:pt-32 md:pt-40">
-          <div className="grid items-end gap-10 lg:grid-cols-12 lg:gap-12">
+          <div className="grid items-center gap-10 lg:grid-cols-12 lg:gap-12">
             {/* headline column */}
             <div className="lg:col-span-7">
               <Rise>
@@ -604,9 +534,9 @@ export function LandingPage() {
               </Rise>
               <Rise className="mt-7" style={{ transitionDelay: "120ms" }}>
                 <p className="prose-pretty text-[17px] leading-relaxed text-ink-2">
-                  Long Exposures pulls the frames out of a clip you already shot and blends the
-                  ones you choose — tripod-grade water, light trails, motion blur. You set the
-                  range. The phone does the rest, and keeps it.
+                  Feed it a clip you already shot. Long Exposures blends the frames you choose into
+                  a single photograph — tripod-grade water, light trails, motion blur. The phone
+                  does the work, and keeps it.
                 </p>
               </Rise>
               <Rise className="mt-9 flex flex-wrap items-center gap-x-7 gap-y-4" style={{ transitionDelay: "200ms" }}>
@@ -618,21 +548,18 @@ export function LandingPage() {
               </Rise>
             </div>
 
-            {/* hero proof: the frame selector instrument */}
+            {/* hero proof: the finished result, framed as a clip's output */}
             <div className="lg:col-span-5">
               <Rise style={{ transitionDelay: "160ms" }}>
-                <FrameSelector />
+                <HeroResult
+                  alt="A finished long exposure — e.g. silky water or night light trails, exported from the app"
+                  frames={67}
+                  exposure="ƒ/16 · 4.0s"
+                />
               </Rise>
             </div>
           </div>
 
-          {/* full-bleed result strip */}
-          <Rise className="mt-16 grid grid-cols-2 gap-px border border-line bg-line md:grid-cols-4" style={{ transitionDelay: "120ms" }}>
-            <FrameSlot alt="Silky waterfall blurred to mist over wet rock" caption="Falls, long" mode="AVG" exposure="2.5s" className="border-0" />
-            <FrameSlot alt="Red and white car light trails on a night highway curve" caption="Highway 1" mode="LTN" exposure="6.0s" className="border-0" />
-            <FrameSlot alt="Star trails arcing over a dark ridgeline" caption="North ridge" mode="LTN" exposure="30s" className="border-0" />
-            <FrameSlot alt="Empty plaza with moving people subtracted out" caption="Piazza, clear" mode="DRK" exposure="8.0s" className="border-0" />
-          </Rise>
         </section>
 
         {/* ============ FRAMES / why you pick ============ */}
@@ -741,37 +668,6 @@ export function LandingPage() {
           </Rise>
         </section>
 
-        {/* ============ DEVICE / privacy ============ */}
-        <section id="device" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 md:py-36">
-          <Rise>
-            <div className="border border-line bg-panel p-8 sm:p-12 md:p-16">
-              <SectionLabel index="④" name="On device" />
-              <h2 className="mt-7 max-w-3xl font-display text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold leading-[0.95] text-ink">
-                Your photos never leave the phone.
-              </h2>
-              <p className="prose-pretty mt-7 text-[16px] leading-relaxed text-ink-2">
-                Every blend, alignment, and export runs on the device's own Metal GPU. No servers,
-                no account, no analytics, no third-party SDKs. There's nothing to upload because
-                there's nowhere to upload it — privacy by architecture, not by policy.
-              </p>
-
-              <dl className="mt-12 grid gap-px border border-line bg-line sm:grid-cols-3">
-                {[
-                  ["00", "frames uploaded", "Processing is 100% local."],
-                  ["GPU", "Metal compute", "Reduction over N frames in linear light, on-device."],
-                  ["—", "accounts required", "Open it and edit. No sign-in, ever."],
-                ].map(([big, label, sub]) => (
-                  <div key={label} className="bg-panel p-6 sm:p-7">
-                    <div className="font-mono text-3xl font-medium tabular-nums text-signal-soft">{big}</div>
-                    <div className="mt-2 text-[14px] font-medium text-ink">{label}</div>
-                    <div className="mt-1 text-[13px] leading-snug text-ink-3">{sub}</div>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          </Rise>
-        </section>
-
         {/* ============ GET ============ */}
         <section id="get" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 md:py-40">
           <Rise className="flex flex-col items-start gap-8 border-t border-line pt-16 md:flex-row md:items-end md:justify-between">
@@ -798,7 +694,7 @@ export function LandingPage() {
             </div>
             <Mono className="text-ink-3">Photo &amp; Video · iPhone · iOS 17+</Mono>
             <div className="flex items-center gap-6 text-[13px] text-ink-2">
-              <a href="#" className="transition-colors hover:text-ink">Privacy</a>
+              <a href="/privacy.html" className="transition-colors hover:text-ink">Privacy</a>
               <a href="mailto:james.william.hou@gmail.com" className="transition-colors hover:text-ink">Support</a>
             </div>
           </div>
