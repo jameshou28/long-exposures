@@ -84,6 +84,8 @@ struct TimelineStrip: View {
                     .fill(.white.opacity(0.9))
                     .frame(width: 2, height: height * 0.4)
             )
+            // Visual handle stays 14pt; expand the touch target to HIG's 44pt minimum.
+            .contentShape(Rectangle().inset(by: -(44 - handleWidth) / 2))
             .position(x: centerX, y: height / 2)
             .gesture(
                 DragGesture(minimumDistance: 0)
@@ -97,5 +99,17 @@ struct TimelineStrip: View {
                         }
                     }
             )
+            .accessibilityElement()
+            .accessibilityLabel(isStart ? "Range start" : "Range end")
+            .accessibilityValue("Frame \(index + 1) of \(count)")
+            .accessibilityAdjustableAction { direction in
+                let delta = direction == .increment ? 1 : -1
+                let next = min(max(index + delta, 0), count - 1)
+                if isStart {
+                    selectionStart = min(next, max(selectionStart, selectionEnd))
+                } else {
+                    selectionEnd = max(next, min(selectionStart, selectionEnd))
+                }
+            }
     }
 }

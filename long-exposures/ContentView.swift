@@ -38,6 +38,7 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "photo.stack")
                     }
+                    .accessibilityLabel("Library")
                 }
                 if editorModel != nil {
                     ToolbarItem(placement: .topBarTrailing) {

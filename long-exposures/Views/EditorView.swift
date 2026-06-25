@@ -17,6 +17,7 @@ struct EditorView: View {
         VStack(spacing: 20) {
             previewCanvas
             modePicker
+            registrationToggle
             timelineSection
             exportSection
         }
@@ -65,7 +66,13 @@ struct EditorView: View {
         ZStack {
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.black)
-            if let image = model.previewImage {
+            if let error = model.previewError {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .padding()
+            } else if let image = model.previewImage {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
@@ -83,6 +90,24 @@ struct EditorView: View {
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(4.0 / 3.0, contentMode: .fit)
+    }
+
+    private var registrationToggle: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Toggle(isOn: $model.registrationEnabled) {
+                    Text("Align frames")
+                }
+                .disabled(model.isRegistering)
+                if model.isRegistering {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            Text("basically tryna sharpen background.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private var modePicker: some View {

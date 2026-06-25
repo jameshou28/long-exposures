@@ -138,6 +138,7 @@ struct ExposureDetailView: View {
                     } label: {
                         Image(systemName: "trash")
                     }
+                    .accessibilityLabel("Delete exposure")
                 }
             }
             .sheet(isPresented: $isSharing) {

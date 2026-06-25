@@ -39,6 +39,20 @@ final class EditorViewModel {
 
     var frameCount: Int { frameStore.previewFrames.count }
     var isBlending = false
+    var previewError: String?
+
+    /// Aligns handheld frames so the static background stays sharp (Phase 5).
+    /// Alignment is computed around the *centre of the current selection*, so the
+    /// part of the scene being blended is what stays sharp.
+    var registrationEnabled = false {
+        didSet {
+            guard registrationEnabled != oldValue else { return }
+            frameStore.setRegistration(enabled: registrationEnabled)
+            engine.invalidateCache()
+            scheduleBlend()
+        }
+    }
+    var isRegistering = false
 
     // Export state.
     var isExporting = false
@@ -81,15 +95,32 @@ final class EditorViewModel {
     }
 
     private func blend(start: Int, end: Int, mode: BlendMode) async {
-        let frames = frameStore.previewFrames
-        guard !frames.isEmpty else { return }
+        guard frameStore.previewFrames.count > 0 else { return }
         isBlending = true
-        defer { isBlending = false }
+        if registrationEnabled { isRegistering = true }
+        defer {
+            isBlending = false
+            isRegistering = false
+        }
         do {
-            let cgImage = try engine.blend(frames: frames, range: start...end, mode: mode)
+            let cgImage: CGImage
+            if registrationEnabled {
+                // Aligned to the centre of *this* selection. The aligned pixels
+                // change with the selection, so bypass the engine's range cache.
+                let frames = await frameStore.previewFrames(for: start...end)
+                guard !Task.isCancelled, !frames.isEmpty else { return }
+                cgImage = try engine.blend(frames: frames, mode: mode)
+            } else {
+                // Raw frames: the cached range blend makes drag-replay instant.
+                let frames = frameStore.previewFrames
+                guard !frames.isEmpty else { return }
+                cgImage = try engine.blend(frames: frames, range: start...end, mode: mode)
+            }
             guard !Task.isCancelled else { return }
             previewImage = UIImage(cgImage: cgImage)
+            previewError = nil
         } catch {
+            previewError = "Preview failed: \(error.localizedDescription)"
             print("[long-exposures] preview blend failed: \(error)")
         }
     }
@@ -97,8 +128,7 @@ final class EditorViewModel {
     /// Renders the current selection at full resolution, saves it to the in-app
     /// library, and optionally to the system Photos library.
     func export(saveToPhotos: Bool) async {
-        let frames = frameStore.fullResolutionFrames
-        guard !frames.isEmpty else { return }
+        guard frameStore.fullResolutionFrames.count > 0 else { return }
         let start = min(selectionStart, selectionEnd)
         let end = max(selectionStart, selectionEnd)
         let mode = mode
@@ -109,9 +139,13 @@ final class EditorViewModel {
         defer { isExporting = false }
 
         do {
+            // Full-res frames, aligned to this selection's centre when registration
+            // is on. Already sliced to the range, so blend the whole array.
+            let frames = await frameStore.fullResolutionFrames(for: start...end)
+            guard !frames.isEmpty else { return }
             let service = ExportService(engine: engine)
             let cgImage = try service.renderFullResolution(
-                frames: frames, range: start...end, mode: mode, resolution: exportResolution)
+                frames: frames, range: 0...(frames.count - 1), mode: mode, resolution: exportResolution)
             try library.add(image: cgImage, mode: mode, frameCount: frameCount)
             if saveToPhotos {
                 try await ExportService.saveToPhotos(cgImage)
