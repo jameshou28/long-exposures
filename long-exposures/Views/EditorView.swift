@@ -17,7 +17,7 @@ struct EditorView: View {
         VStack(spacing: 20) {
             previewCanvas
             modePicker
-            registrationToggle
+            adjustments
             timelineSection
             exportSection
         }
@@ -92,19 +92,32 @@ struct EditorView: View {
         .aspectRatio(4.0 / 3.0, contentMode: .fit)
     }
 
-    private var registrationToggle: some View {
+    private var adjustments: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            toggleRow(
+                title: "Align frames",
+                caption: "basically tryna sharpen background.",
+                isOn: $model.registrationEnabled
+            )
+            toggleRow(
+                title: "Match exposure",
+                caption: "Evens out brightness and colour flicker between frames.",
+                isOn: $model.normalizationEnabled
+            )
+        }
+    }
+
+    private func toggleRow(title: String, caption: String, isOn: Binding<Bool>) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Toggle(isOn: $model.registrationEnabled) {
-                    Text("Align frames")
-                }
-                .disabled(model.isRegistering)
+                Toggle(isOn: isOn) { Text(title) }
+                    .disabled(model.isRegistering)
                 if model.isRegistering {
                     ProgressView()
                         .controlSize(.small)
                 }
             }
-            Text("basically tryna sharpen background.")
+            Text(caption)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

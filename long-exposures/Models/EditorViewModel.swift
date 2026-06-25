@@ -54,6 +54,20 @@ final class EditorViewModel {
     }
     var isRegistering = false
 
+    /// Matches per-frame brightness and white balance to the selection's centre
+    /// frame, removing the pulsing/banding the camera's re-metering causes (Phase 6).
+    var normalizationEnabled = false {
+        didSet {
+            guard normalizationEnabled != oldValue else { return }
+            frameStore.setNormalization(enabled: normalizationEnabled)
+            engine.invalidateCache()
+            scheduleBlend()
+        }
+    }
+
+    /// True while either registration or normalization is reprocessing the selection.
+    private var processesFramesPerSelection: Bool { registrationEnabled || normalizationEnabled }
+
     // Export state.
     var isExporting = false
     var exportMessage: String?
@@ -97,16 +111,16 @@ final class EditorViewModel {
     private func blend(start: Int, end: Int, mode: BlendMode) async {
         guard frameStore.previewFrames.count > 0 else { return }
         isBlending = true
-        if registrationEnabled { isRegistering = true }
+        if processesFramesPerSelection { isRegistering = true }
         defer {
             isBlending = false
             isRegistering = false
         }
         do {
             let cgImage: CGImage
-            if registrationEnabled {
-                // Aligned to the centre of *this* selection. The aligned pixels
-                // change with the selection, so bypass the engine's range cache.
+            if processesFramesPerSelection {
+                // Registration and/or normalization reprocess the selection, so the
+                // pixels change with the range — bypass the engine's range cache.
                 let frames = await frameStore.previewFrames(for: start...end)
                 guard !Task.isCancelled, !frames.isEmpty else { return }
                 cgImage = try engine.blend(frames: frames, mode: mode)

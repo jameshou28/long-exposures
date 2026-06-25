@@ -29,11 +29,15 @@ final class FrameStore {
     /// When true, the blend pulls registration-aligned frames for the selection.
     private(set) var isRegistered = false
 
+    /// When true, frames in the selection are exposure/white-balance matched.
+    private(set) var isNormalized = false
+
     /// Target long edge for preview-resolution frames, in pixels.
     static let previewLongEdge: CGFloat = 720
 
     @ObservationIgnored private let ciContext = CIContext()
     @ObservationIgnored private let registration = RegistrationService()
+    @ObservationIgnored private let normalization = NormalizationService()
 
     /// Cache of per-frame transforms keyed by the reference frame they align to.
     /// One entry holds the transform for every frame relative to that reference,
@@ -46,6 +50,7 @@ final class FrameStore {
         previewFrames = frames.map { downsample($0) }
         transformCache.removeAll()
         isRegistered = false
+        isNormalized = false
     }
 
     func clear() {
@@ -53,10 +58,15 @@ final class FrameStore {
         previewFrames = []
         transformCache.removeAll()
         isRegistered = false
+        isNormalized = false
     }
 
     func setRegistration(enabled: Bool) {
         isRegistered = enabled
+    }
+
+    func setNormalization(enabled: Bool) {
+        isNormalized = enabled
     }
 
     // MARK: - Aligned frames for a selection
@@ -77,14 +87,22 @@ final class FrameStore {
         let lower = max(0, range.lowerBound)
         let upper = min(source.count - 1, range.upperBound)
         guard lower <= upper else { return [] }
-        let slice = Array(source[lower...upper])
-        guard isRegistered, slice.count > 1 else { return slice }
+        var slice = Array(source[lower...upper])
+        guard slice.count > 1, (isRegistered || isNormalized) else { return slice }
 
-        // Reference = centre of the selection, expressed as an absolute frame index.
-        let reference = lower + RegistrationService.referenceIndex(frameCount: slice.count)
-        let transforms = await transforms(reference: reference)
-        return await registration.alignedSlice(of: source, range: lower...upper,
-                                               transforms: transforms, context: ciContext)
+        // Reference = centre of the selection. Pipeline order: register, then normalize.
+        let absoluteReference = lower + RegistrationService.referenceIndex(frameCount: slice.count)
+        let sliceReference = RegistrationService.referenceIndex(frameCount: slice.count)
+
+        if isRegistered {
+            let transforms = await transforms(reference: absoluteReference)
+            slice = await registration.alignedSlice(of: source, range: lower...upper,
+                                                    transforms: transforms, context: ciContext)
+        }
+        if isNormalized {
+            slice = await normalization.normalize(slice, reference: sliceReference, using: ciContext)
+        }
+        return slice
     }
 
     /// Per-frame transforms aligning every frame to `reference`, cached.
