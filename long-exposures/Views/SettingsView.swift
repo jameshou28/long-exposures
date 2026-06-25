@@ -11,6 +11,8 @@ import SwiftUI
 struct SettingsView: View {
 
     @Bindable var settings: AppSettings
+    /// Re-opens the first-launch intro.
+    var onShowOnboarding: () -> Void = {}
 
     var body: some View {
         Form {
@@ -29,6 +31,14 @@ struct SettingsView: View {
                 Text("Defaults")
             } footer: {
                 Text("New edits open with these. You can still change them per edit.")
+            }
+
+            Section {
+                Button {
+                    onShowOnboarding()
+                } label: {
+                    Label("How it works", systemImage: "questionmark.circle")
+                }
             }
 
             Section("About") {

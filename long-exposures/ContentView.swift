@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var isLibraryPresented = false
     @State private var isCapturePresented = false
     @State private var isSettingsPresented = false
+    @State private var isOnboardingPresented = false
     @State private var primingFor: PermissionPriming.Kind?
     @State private var statusMessage = "Pick a Live Photo or video, or capture one to begin."
     @State private var isWorking = false
@@ -90,12 +91,15 @@ struct ContentView: View {
         }
         .sheet(isPresented: $isSettingsPresented) {
             NavigationStack {
-                SettingsView(settings: settings)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") { isSettingsPresented = false }
-                        }
+                SettingsView(settings: settings) {
+                    isSettingsPresented = false
+                    isOnboardingPresented = true
+                }
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { isSettingsPresented = false }
                     }
+                }
             }
         }
         .sheet(item: $primingFor) { kind in
@@ -104,6 +108,17 @@ struct ContentView: View {
                 Task { await proceedAfterPriming(kind) }
             } onCancel: {
                 primingFor = nil
+            }
+        }
+        .fullScreenCover(isPresented: $isOnboardingPresented) {
+            OnboardingView {
+                settings.hasSeenOnboarding = true
+                isOnboardingPresented = false
+            }
+        }
+        .onAppear {
+            if !settings.hasSeenOnboarding {
+                isOnboardingPresented = true
             }
         }
     }
