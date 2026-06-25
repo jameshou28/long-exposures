@@ -9,6 +9,11 @@ import SwiftUI
 
 @main
 struct long_exposuresApp: App {
+    init() {
+        // Reclaim temp video files left behind by imports in earlier runs.
+        ImportService.purgeTempVideos()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

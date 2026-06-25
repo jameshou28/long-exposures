@@ -96,12 +96,12 @@ struct EditorView: View {
         VStack(alignment: .leading, spacing: 12) {
             toggleRow(
                 title: "Align frames",
-                caption: "basically tryna sharpen background.",
+                caption: "basically tryna sharpen background",
                 isOn: $model.registrationEnabled
             )
             toggleRow(
                 title: "Match exposure",
-                caption: "Evens out brightness and colour flicker between frames.",
+                caption: "even out brightness",
                 isOn: $model.normalizationEnabled
             )
         }

@@ -71,11 +71,22 @@ struct ImportService {
         }
     }
 
-    /// Decodes every frame of a video URL to BGRA CVPixelBuffers. Faster than AVAssetImageGenerator for a full sweep.
+    /// Most frames we keep from one clip. A Live Photo's paired video is well under
+    /// this; long regular videos are sampled down so memory and the timeline stay
+    /// bounded. Every kept frame is held full-res, so this is a real ceiling.
+    static let maxFrames = 120
+
+    /// Decodes a video URL to BGRA CVPixelBuffers, evenly sampling down to
+    /// `maxFrames` for long clips. Faster than AVAssetImageGenerator for a sweep.
     func extractFrames(from url: URL) async throws -> [CVPixelBuffer] {
         let asset = AVURLAsset(url: url)
         let tracks = try await asset.loadTracks(withMediaType: .video)
         guard let track = tracks.first else { throw ImportError.noVideoTrack }
+
+        // Estimate the total frame count to pick a sampling stride. We don't know
+        // the exact count up front, so estimate from duration × frame rate and keep
+        // every Nth frame. A short clip gets stride 1 (every frame).
+        let stride = await sampleStride(for: asset, track: track)
 
         let reader = try AVAssetReader(asset: asset)
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
@@ -90,7 +101,11 @@ struct ImportService {
         }
 
         var frames: [CVPixelBuffer] = []
+        var index = 0
         while let sample = output.copyNextSampleBuffer() {
+            defer { index += 1 }
+            // Keep every `stride`-th frame; cap total in case the estimate was low.
+            guard index % stride == 0, frames.count < Self.maxFrames else { continue }
             if let buffer = CMSampleBufferGetImageBuffer(sample) {
                 frames.append(buffer)
             }
@@ -103,9 +118,43 @@ struct ImportService {
         return frames
     }
 
-    /// Convenience: PHAsset → paired video URL → frames.
+    /// Stride that keeps a clip at or under `maxFrames`, sampled evenly. Returns 1
+    /// (keep every frame) for short clips or when the count can't be estimated.
+    private func sampleStride(for asset: AVAsset, track: AVAssetTrack) async -> Int {
+        guard let duration = try? await asset.load(.duration),
+              let frameRate = try? await track.load(.nominalFrameRate),
+              frameRate > 0, duration.seconds.isFinite, duration.seconds > 0 else {
+            return 1
+        }
+        let estimatedTotal = Int((duration.seconds * Double(frameRate)).rounded())
+        guard estimatedTotal > Self.maxFrames else { return 1 }
+        return Int((Double(estimatedTotal) / Double(Self.maxFrames)).rounded(.up))
+    }
+
+    /// Convenience: PHAsset → paired video URL → frames. Deletes the temp video
+    /// it wrote once decoding finishes (success or failure) so it doesn't linger.
     func extractFrames(from asset: PHAsset) async throws -> [CVPixelBuffer] {
         let url = try await videoURL(for: asset)
+        defer { Self.removeTempFile(url) }
         return try await extractFrames(from: url)
+    }
+
+    /// Removes a file we wrote into the temp directory. No-op for anything outside it.
+    static func removeTempFile(_ url: URL) {
+        let tempDir = FileManager.default.temporaryDirectory.standardizedFileURL.path
+        guard url.standardizedFileURL.path.hasPrefix(tempDir) else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    /// One-shot cleanup of leftover temp video files from earlier runs (e.g. an
+    /// import that crashed before its `defer` ran). Safe to call at launch.
+    static func purgeTempVideos() {
+        let fm = FileManager.default
+        let tempDir = fm.temporaryDirectory
+        let videoExtensions: Set<String> = ["mov", "mp4", "m4v"]
+        guard let contents = try? fm.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil) else { return }
+        for url in contents where videoExtensions.contains(url.pathExtension.lowercased()) {
+            try? fm.removeItem(at: url)
+        }
     }
 }
