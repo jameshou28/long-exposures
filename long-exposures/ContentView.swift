@@ -6,13 +6,12 @@
 //
 
 import SwiftUI
-import PhotosUI
 import Photos
 
 struct ContentView: View {
 
     @State private var frameStore = FrameStore()
-    @State private var pickedItem: PhotosPickerItem?
+    @State private var isPickerPresented = false
     @State private var statusMessage = "Pick a Live Photo to extract its frames."
     @State private var dumpDirectory: URL?
     @State private var isWorking = false
@@ -38,7 +37,9 @@ struct ContentView: View {
                 ProgressView()
             }
 
-            PhotosPicker(selection: $pickedItem, matching: .livePhotos) {
+            Button {
+                Task { await beginPick() }
+            } label: {
                 Text("Pick Live Photo")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
@@ -46,7 +47,7 @@ struct ContentView: View {
                     .background(.tint, in: RoundedRectangle(cornerRadius: 12))
                     .foregroundStyle(.white)
             }
-            .disabled(isWorking || !canPick)
+            .disabled(isWorking)
 
             if !frameStore.fullResolutionFrames.isEmpty {
                 VStack(spacing: 4) {
@@ -69,45 +70,51 @@ struct ContentView: View {
             Spacer()
         }
         .padding()
-        .task {
-            authStatus = await ImportService.requestAuthorization()
-            if !canPick {
-                statusMessage = "Photo library access denied. Enable it in Settings."
+        .sheet(isPresented: $isPickerPresented) {
+            LivePhotoPicker { identifiers in
+                isPickerPresented = false
+                print("[long-exposures] picker returned identifiers: \(identifiers)")
+                guard let identifier = identifiers.first else {
+                    statusMessage = "Picker returned with no asset identifier (was cancelled or no Live Photo selected)."
+                    return
+                }
+                Task { await handlePickedAsset(identifier: identifier) }
             }
         }
-        .onChange(of: pickedItem) { _, newItem in
-            guard let newItem else { return }
-            Task { await handlePicked(item: newItem) }
+    }
+
+    private func beginPick() async {
+        let status = await ImportService.requestAuthorization()
+        authStatus = status
+        print("[long-exposures] photo auth status: \(status.rawValue)")
+        guard status == .authorized || status == .limited else {
+            statusMessage = "Photo library access denied. Enable it in Settings."
+            return
         }
+        statusMessage = "Opening picker…"
+        isPickerPresented = true
     }
 
-    private var canPick: Bool {
-        authStatus == .authorized || authStatus == .limited
-    }
-
-    private func handlePicked(item: PhotosPickerItem) async {
+    private func handlePickedAsset(identifier: String) async {
         isWorking = true
         dumpDirectory = nil
         defer { isWorking = false }
 
-        guard let identifier = item.itemIdentifier else {
-            statusMessage = "Picked item has no asset identifier."
-            return
-        }
-
         statusMessage = "Loading paired video…"
         do {
             let asset = try importService.asset(forLocalIdentifier: identifier)
+            print("[long-exposures] resolved PHAsset, mediaSubtypes: \(asset.mediaSubtypes.rawValue)")
             let frames = try await importService.extractFrames(from: asset)
             statusMessage = "Decoded \(frames.count) frames. Building preview set…"
             frameStore.ingest(frames: frames)
             statusMessage = "Writing \(frames.count) PNGs to disk…"
             let directory = try FrameDebugWriter.dumpPNGs(frames)
             dumpDirectory = directory
-            statusMessage = "Done."
+            statusMessage = "Done. Extracted \(frames.count) frames."
             print("[long-exposures] Extracted PNG dump:", directory.path)
         } catch {
             statusMessage = "Failed: \(error.localizedDescription)"
+            print("[long-exposures] error: \(error)")
         }
     }
 }
