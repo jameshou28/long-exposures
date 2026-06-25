@@ -35,4 +35,19 @@ enum FrameDebugWriter {
 
         return directory
     }
+
+    /// Writes a single blended CGImage to a temp PNG and returns its URL.
+    @discardableResult
+    static func dumpPNG(_ image: CGImage, name: String = "blend") throws -> URL {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+            .replacingOccurrences(of: ":", with: "-")
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(name)-\(timestamp).png")
+        guard let data = UIImage(cgImage: image).pngData() else {
+            throw NSError(domain: "FrameDebugWriter", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "PNG encode failed"])
+        }
+        try data.write(to: url)
+        return url
+    }
 }

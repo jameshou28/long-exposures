@@ -46,7 +46,7 @@ Import → Register → Normalize → Select → Blend → Export
 - **Engine before UI.** Verify the blend engine by writing output to disk with no interface.
 - **Phases are sequential.** Do not skip ahead. Later phases depend on earlier ones.
 - **Each phase ends with something runnable.** After each phase, build and run on a real device before continuing.
-- Current phase: **Phase 2** (blend engine). Phases 0–1 complete: project setup, folder structure, and frame extraction all working. `ImportService` (PHAsset → paired video → `AVAssetReader` BGRA sweep), `FrameStore` (full-res + 720px preview set), `LivePhotoPicker`, and `FrameDebugWriter` are built. `ContentView.swift` is a Phase 1 debug screen (pick → extract → dump PNGs). `BlendKernels.metal` is still the pass-through placeholder — Phase 2 replaces it.
+- Current phase: **Phase 2** (blend engine) — code complete, builds clean for simulator; **not yet run on a real device**. Phases 0–1 done: project setup, folder structure, frame extraction. `ImportService` (PHAsset → paired video → `AVAssetReader` BGRA sweep), `FrameStore` (full-res + 720px preview set), `LivePhotoPicker`, `FrameDebugWriter` (now also dumps a single blended CGImage). `BlendKernels.metal` holds the real linear-light reduction kernels (`accumulate_average/lighten/darken` + `resolve`). `BlendEngine.swift` drives them: per-frame accumulation into an rgba32Float texture, sRGB↔linear conversion, returns a `CGImage`. `ContentView.swift` is a Phase 1–2 debug screen (pick → extract → blend average/lighten/darken → preview + dump PNG). Deployment target is iOS 17.0, iPhone-only.
 
 ## Blend engine specifics (Phase 2 — the technical heart)
 
