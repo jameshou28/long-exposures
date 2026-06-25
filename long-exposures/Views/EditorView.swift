@@ -87,9 +87,25 @@ struct EditorView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .padding()
             }
+            if model.isComparing {
+                Text("Original frame")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(.black.opacity(0.5), in: Capsule())
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding()
+            }
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(4.0 / 3.0, contentMode: .fit)
+        // Press and hold to compare the blend against a single sharp frame.
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in if !model.isComparing { model.isComparing = true } }
+                .onEnded { _ in model.isComparing = false }
+        )
     }
 
     private var adjustments: some View {

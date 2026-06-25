@@ -68,6 +68,16 @@ final class EditorViewModel {
     /// True while either registration or normalization is reprocessing the selection.
     private var processesFramesPerSelection: Bool { registrationEnabled || normalizationEnabled }
 
+    /// Whether the user is holding the preview to compare against a single sharp
+    /// frame (before/after). Doesn't re-blend; toggles which image is shown.
+    var isComparing = false {
+        didSet { if isComparing != oldValue { Task { await refreshDisplayedImage() } } }
+    }
+    /// The last blended result, kept so compare can swap back without re-blending.
+    private var blendedImage: UIImage?
+    /// A sharp single-frame image for compare, at preview res.
+    private var compareImage: UIImage?
+
     // Export state.
     var isExporting = false
     var exportMessage: String?
@@ -116,26 +126,41 @@ final class EditorViewModel {
             isBlending = false
             isRegistering = false
         }
+
         do {
             let cgImage: CGImage
+            // Compare shows the selection's centre frame — the natural sharp reference.
+            let compareSliceIndex = RegistrationService.referenceIndex(frameCount: end - start + 1)
+
             if processesFramesPerSelection {
-                // Registration and/or normalization reprocess the selection, so the
-                // pixels change with the range — bypass the engine's range cache.
                 let frames = await frameStore.previewFrames(for: start...end)
                 guard !Task.isCancelled, !frames.isEmpty else { return }
                 cgImage = try engine.blend(frames: frames, mode: mode)
+                let cmp = min(compareSliceIndex, frames.count - 1)
+                compareImage = UIImage(cgImage: try engine.render(frame: frames[cmp]))
             } else {
-                // Raw frames: the cached range blend makes drag-replay instant.
                 let frames = frameStore.previewFrames
                 guard !frames.isEmpty else { return }
                 cgImage = try engine.blend(frames: frames, range: start...end, mode: mode)
+                let absolute = min(start + compareSliceIndex, frames.count - 1)
+                compareImage = UIImage(cgImage: try engine.render(frame: frames[absolute]))
             }
             guard !Task.isCancelled else { return }
-            previewImage = UIImage(cgImage: cgImage)
+            blendedImage = UIImage(cgImage: cgImage)
             previewError = nil
+            await refreshDisplayedImage()
         } catch {
             previewError = "Preview failed: \(error.localizedDescription)"
             print("[long-exposures] preview blend failed: \(error)")
+        }
+    }
+
+    /// Shows either the blend or, while comparing, a single sharp frame.
+    private func refreshDisplayedImage() async {
+        if isComparing, let compareImage {
+            previewImage = compareImage
+        } else {
+            previewImage = blendedImage
         }
     }
 

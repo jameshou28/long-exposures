@@ -310,6 +310,13 @@ final class BlendEngine {
         return texture
     }
 
+    /// Renders one frame to a CGImage through the same pipeline as the blend, so its
+    /// orientation matches a blended result. Used by the before/after compare view.
+    /// A one-frame average is just the frame itself.
+    func render(frame: CVPixelBuffer) throws -> CGImage {
+        try blend(frames: [frame], mode: .average)
+    }
+
     // MARK: - Readback
 
     private func cgImage(from texture: MTLTexture) throws -> CGImage {
