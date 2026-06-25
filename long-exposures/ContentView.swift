@@ -11,8 +11,10 @@ import Photos
 struct ContentView: View {
 
     @State private var frameStore = FrameStore()
+    @State private var library = LibraryStore()
     @State private var editorModel: EditorViewModel?
     @State private var isPickerPresented = false
+    @State private var isLibraryPresented = false
     @State private var statusMessage = "Pick a Live Photo to begin."
     @State private var isWorking = false
 
@@ -30,6 +32,13 @@ struct ContentView: View {
             .navigationTitle("Long Exposures")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        isLibraryPresented = true
+                    } label: {
+                        Image(systemName: "photo.stack")
+                    }
+                }
                 if editorModel != nil {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("New") { Task { await beginPick() } }
@@ -46,6 +55,16 @@ struct ContentView: View {
                     return
                 }
                 Task { await handlePickedAsset(identifier: identifier) }
+            }
+        }
+        .sheet(isPresented: $isLibraryPresented) {
+            NavigationStack {
+                LibraryView(library: library)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { isLibraryPresented = false }
+                        }
+                    }
             }
         }
     }
@@ -105,7 +124,7 @@ struct ContentView: View {
             frameStore.ingest(frames: frames)
 
             let engine = try BlendEngine()
-            let model = EditorViewModel(frameStore: frameStore, engine: engine)
+            let model = EditorViewModel(frameStore: frameStore, engine: engine, library: library)
             model.load()
             editorModel = model
         } catch {

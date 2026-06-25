@@ -40,11 +40,18 @@ final class EditorViewModel {
     var frameCount: Int { frameStore.previewFrames.count }
     var isBlending = false
 
-    private var blendTask: Task<Void, Never>?
+    // Export state.
+    var isExporting = false
+    var exportMessage: String?
+    var exportResolution: ExportResolution = .full
 
-    init(frameStore: FrameStore, engine: BlendEngine) {
+    private var blendTask: Task<Void, Never>?
+    private let library: LibraryStore
+
+    init(frameStore: FrameStore, engine: BlendEngine, library: LibraryStore) {
         self.frameStore = frameStore
         self.engine = engine
+        self.library = library
     }
 
     /// Reset selection to the full clip and rebuild thumbnails after an import.
@@ -84,6 +91,37 @@ final class EditorViewModel {
             previewImage = UIImage(cgImage: cgImage)
         } catch {
             print("[long-exposures] preview blend failed: \(error)")
+        }
+    }
+
+    /// Renders the current selection at full resolution, saves it to the in-app
+    /// library, and optionally to the system Photos library.
+    func export(saveToPhotos: Bool) async {
+        let frames = frameStore.fullResolutionFrames
+        guard !frames.isEmpty else { return }
+        let start = min(selectionStart, selectionEnd)
+        let end = max(selectionStart, selectionEnd)
+        let mode = mode
+        let frameCount = end - start + 1
+
+        isExporting = true
+        exportMessage = "Rendering full resolution…"
+        defer { isExporting = false }
+
+        do {
+            let service = ExportService(engine: engine)
+            let cgImage = try service.renderFullResolution(
+                frames: frames, range: start...end, mode: mode, resolution: exportResolution)
+            try library.add(image: cgImage, mode: mode, frameCount: frameCount)
+            if saveToPhotos {
+                try await ExportService.saveToPhotos(cgImage)
+                exportMessage = "Saved to library and Photos."
+            } else {
+                exportMessage = "Saved to library."
+            }
+        } catch {
+            exportMessage = "Export failed: \(error.localizedDescription)"
+            print("[long-exposures] export failed: \(error)")
         }
     }
 }

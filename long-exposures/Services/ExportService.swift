@@ -13,7 +13,7 @@ import CoreImage
 import Photos
 import UIKit
 
-enum ExportResolution {
+enum ExportResolution: Hashable {
     case full      // native frame resolution
     case standard  // long edge capped for smaller files / faster save
 
@@ -52,7 +52,7 @@ struct ExportService {
     }
 
     /// Saves an image to the system Photos library. Requests add authorization if needed.
-    func saveToPhotos(_ image: CGImage) async throws {
+    static func saveToPhotos(_ image: CGImage) async throws {
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         guard status == .authorized || status == .limited else {
             throw ImportError.authorizationDenied

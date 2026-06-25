@@ -18,8 +18,47 @@ struct EditorView: View {
             previewCanvas
             modePicker
             timelineSection
+            exportSection
         }
         .padding()
+    }
+
+    private var exportSection: some View {
+        VStack(spacing: 10) {
+            Picker("Resolution", selection: $model.exportResolution) {
+                Text("Full").tag(ExportResolution.full)
+                Text("Standard").tag(ExportResolution.standard)
+            }
+            .pickerStyle(.segmented)
+
+            HStack(spacing: 12) {
+                Button {
+                    Task { await model.export(saveToPhotos: false) }
+                } label: {
+                    Label("Save", systemImage: "square.and.arrow.down")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    Task { await model.export(saveToPhotos: true) }
+                } label: {
+                    Label("Save to Photos", systemImage: "photo.on.rectangle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .disabled(model.isExporting)
+
+            if model.isExporting {
+                ProgressView()
+            }
+            if let message = model.exportMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     private var previewCanvas: some View {
