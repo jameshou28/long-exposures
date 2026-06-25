@@ -86,10 +86,12 @@ final class EditorViewModel {
     private var blendTask: Task<Void, Never>?
     private let library: LibraryStore
 
-    init(frameStore: FrameStore, engine: BlendEngine, library: LibraryStore) {
+    init(frameStore: FrameStore, engine: BlendEngine, library: LibraryStore, settings: AppSettings) {
         self.frameStore = frameStore
         self.engine = engine
         self.library = library
+        self.mode = settings.defaultMode
+        self.exportResolution = settings.defaultResolution
     }
 
     /// Reset selection to the full clip and rebuild thumbnails after an import.

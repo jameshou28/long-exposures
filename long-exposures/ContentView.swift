@@ -8,15 +8,19 @@
 import SwiftUI
 import Photos
 import CoreVideo
+import AVFoundation
 
 struct ContentView: View {
 
     @State private var frameStore = FrameStore()
     @State private var library = LibraryStore()
+    @State private var settings = AppSettings()
     @State private var editorModel: EditorViewModel?
     @State private var isPickerPresented = false
     @State private var isLibraryPresented = false
     @State private var isCapturePresented = false
+    @State private var isSettingsPresented = false
+    @State private var primingFor: PermissionPriming.Kind?
     @State private var statusMessage = "Pick a Live Photo or video, or capture one to begin."
     @State private var isWorking = false
 
@@ -42,7 +46,16 @@ struct ContentView: View {
                     }
                     .accessibilityLabel("Library")
                 }
-                if editorModel != nil {
+                if editorModel == nil {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            isSettingsPresented = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                        }
+                        .accessibilityLabel("Settings")
+                    }
+                } else {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("New") { returnToLanding() }
                             .disabled(isWorking)
@@ -73,6 +86,24 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $isCapturePresented) {
             CaptureView { frames in
                 Task { await handleCapturedFrames(frames) }
+            }
+        }
+        .sheet(isPresented: $isSettingsPresented) {
+            NavigationStack {
+                SettingsView(settings: settings)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { isSettingsPresented = false }
+                        }
+                    }
+            }
+        }
+        .sheet(item: $primingFor) { kind in
+            PermissionPriming(kind: kind) {
+                primingFor = nil
+                Task { await proceedAfterPriming(kind) }
+            } onCancel: {
+                primingFor = nil
             }
         }
     }
@@ -125,6 +156,31 @@ struct ContentView: View {
     }
 
     private func beginPick() async {
+        // Prime before the cold system prompt the first time; otherwise proceed.
+        if PHPhotoLibrary.authorizationStatus(for: .readWrite) == .notDetermined {
+            primingFor = .photos
+            return
+        }
+        await requestAndPick()
+    }
+
+    private func beginCapture() async {
+        if AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined {
+            primingFor = .camera
+            return
+        }
+        await requestAndCapture()
+    }
+
+    /// After the priming screen's "Continue", trigger the real system prompt.
+    private func proceedAfterPriming(_ kind: PermissionPriming.Kind) async {
+        switch kind {
+        case .photos: await requestAndPick()
+        case .camera: await requestAndCapture()
+        }
+    }
+
+    private func requestAndPick() async {
         let status = await ImportService.requestAuthorization()
         guard status == .authorized || status == .limited else {
             statusMessage = "Photo library access denied. Enable it in Settings."
@@ -135,7 +191,7 @@ struct ContentView: View {
         isPickerPresented = true
     }
 
-    private func beginCapture() async {
+    private func requestAndCapture() async {
         let status = await CaptureService.requestAuthorization()
         guard status == .authorized else {
             statusMessage = "Camera access denied. Enable it in Settings."
@@ -163,7 +219,7 @@ struct ContentView: View {
 
     private func makeEditor() throws -> EditorViewModel {
         let engine = try BlendEngine()
-        let model = EditorViewModel(frameStore: frameStore, engine: engine, library: library)
+        let model = EditorViewModel(frameStore: frameStore, engine: engine, library: library, settings: settings)
         model.load()
         return model
     }

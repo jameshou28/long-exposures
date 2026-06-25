@@ -17,7 +17,7 @@ import Metal
 import CoreVideo
 import CoreImage
 
-enum BlendMode {
+enum BlendMode: String, CaseIterable {
     case average
     case lighten
     case darken

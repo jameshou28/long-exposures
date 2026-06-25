@@ -13,7 +13,7 @@ import CoreImage
 import Photos
 import UIKit
 
-enum ExportResolution: Hashable {
+enum ExportResolution: String, Hashable, CaseIterable {
     case full      // native frame resolution
     case standard  // long edge capped for smaller files / faster save
 
