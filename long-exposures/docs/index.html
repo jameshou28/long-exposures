@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Long Exposures — Support & Privacy</title>
+  <meta name="description" content="Long Exposures turns your Live Photos and videos into custom long-exposure images, entirely on your device. Support and privacy policy.">
+  <style>
+    :root {
+      --bg: #0a0c12;
+      --bg-soft: #12151f;
+      --text: #e9ecf2;
+      --muted: #9aa3b2;
+      --tint: #0a84ff;
+      --border: #1e2230;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: radial-gradient(120% 80% at 50% 0%, #161a26 0%, var(--bg) 55%);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 96px; }
+    header { text-align: center; margin-bottom: 56px; }
+    .mark {
+      width: 96px; height: 96px; margin: 0 auto 20px;
+      display: block;
+    }
+    h1 { font-size: 2rem; margin: 0 0 8px; letter-spacing: -0.02em; }
+    .tagline { color: var(--muted); font-size: 1.05rem; margin: 0; }
+    section {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 28px;
+      margin-bottom: 24px;
+    }
+    h2 { font-size: 1.25rem; margin: 0 0 14px; letter-spacing: -0.01em; }
+    h3 { font-size: 1rem; margin: 22px 0 6px; color: var(--text); }
+    p, li { color: var(--muted); }
+    a { color: var(--tint); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    ul { padding-left: 20px; margin: 8px 0; }
+    .pill {
+      display: inline-block; font-size: 0.8rem; font-weight: 600;
+      color: var(--tint); background: rgba(10,132,255,0.12);
+      border: 1px solid rgba(10,132,255,0.3);
+      padding: 4px 12px; border-radius: 999px; margin-bottom: 8px;
+    }
+    .updated { color: var(--muted); font-size: 0.85rem; }
+    footer { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 40px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <!-- Aperture mark, inline SVG (no external assets needed) -->
+      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="40" fill="none" stroke="#0a84ff" stroke-width="5"/>
+        <g fill="#0a84ff">
+          <path d="M50 14 L78 30 L54 44 Z"/>
+          <path d="M86 50 L70 78 L56 54 Z"/>
+          <path d="M50 86 L22 70 L46 56 Z"/>
+          <path d="M14 50 L30 22 L44 46 Z"/>
+        </g>
+        <polygon points="50,38 62,46 62,58 50,66 38,58 38,46" fill="#0a0c12"/>
+      </svg>
+      <h1>Long Exposures</h1>
+      <p class="tagline">Turn a Live Photo or video into a long exposure. You pick the frames.</p>
+    </header>
+
+    <section>
+      <h2>What it does</h2>
+      <p>
+        Long Exposures blends the frames of a Live Photo or video into a single image:
+        silky water, light trails, motion blur, the kind of shot that usually needs a
+        tripod and a DSLR. Unlike the built-in effect, you choose exactly which frames
+        blend, with a frame-by-frame timeline and a live preview. Everything runs on
+        your device.
+      </p>
+    </section>
+
+    <section>
+      <h2>Support</h2>
+      <p>
+        Questions, bugs, or feature ideas? Email
+        <a href="mailto:james.william.hou@gmail.com">james.william.hou@gmail.com</a>
+        and I'll get back to you.
+      </p>
+      <h3>Common questions</h3>
+      <ul>
+        <li><strong>Why does it ask for photo access?</strong> To import the Live Photo or video you want to blend. It only reads what you pick.</li>
+        <li><strong>Why camera access?</strong> Only if you use in-app Capture to record a new clip.</li>
+        <li><strong>Where do my exposures go?</strong> To your Photos library (with your permission) and the app's own library on your device.</li>
+        <li><strong>Does anything get uploaded?</strong> No. All processing is on-device.</li>
+      </ul>
+    </section>
+
+    <section id="privacy">
+      <span class="pill">No data collected</span>
+      <h2>Privacy Policy</h2>
+      <p class="updated">Last updated: June 25, 2026</p>
+      <p>
+        Long Exposures does not collect, store, transmit, or share any personal data.
+      </p>
+      <p>
+        All photo and video processing happens entirely on your device. The app
+        accesses your photo library and camera only to import or capture the clips you
+        choose to edit, and only while you are using those features. Nothing you import,
+        capture, or create is uploaded to any server. The app has no accounts, no
+        analytics, and no third-party tracking.
+      </p>
+      <p>
+        Images you save are written to your own device: to your Photos library (with
+        your permission) and to the app's private library, which is removed if you
+        delete the app.
+      </p>
+      <p>
+        Because there is no data collection, there is nothing to request, export, or
+        delete from us. If you have any questions about this policy, email
+        <a href="mailto:james.william.hou@gmail.com">james.william.hou@gmail.com</a>.
+      </p>
+    </section>
+
+    <footer>
+      © 2026 Long Exposures. Made on-device, with no strings attached.
+    </footer>
+  </div>
+</body>
+</html>

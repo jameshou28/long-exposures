@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Darker Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, "SF Mono", monospace;
+
+  /* True-dark instrument surface. Photos carry the color. */
+  --color-base: #0b0c0e;        /* body */
+  --color-panel: #121417;       /* raised machined panel */
+  --color-panel-2: #181b1f;     /* inset / well */
+  --color-line: #24282e;        /* hairline rules */
+  --color-line-bright: #343a42; /* emphasized hairline */
+  --color-ink: #f1f3f5;         /* primary text, 13.8:1 on base */
+  --color-ink-2: #aeb4bc;       /* secondary text, ~6.7:1 on base */
+  --color-ink-3: #6b7178;       /* tertiary / labels, ~3.6:1 (UI/large only) */
+  --color-signal: #2d8cff;      /* the icon blue — functional accent only */
+  --color-signal-soft: #67a9ff;
+}
+
+:root {
+  color-scheme: dark;
+  --z-nav: 40;
+  --z-overlay: 50;
+  --z-grain: 60;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-base);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* Display face needs tightening + balance; light type on dark gets extra leading. */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.prose-pretty {
+  text-wrap: pretty;
+  max-width: 68ch;
+}
+
+/* Mechanical entrance. The DEFAULT state is fully visible — content never depends
+   on JS or a transition firing. Only when JS adds `.arm` (because the element starts
+   below the fold and motion is allowed) does it take a hidden "from" state, then
+   `.in` animates it back. Headless renderers and no-JS both ship the visible default. */
+@media (prefers-reduced-motion: no-preference) {
+  .rise.arm {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform, opacity;
+  }
+  .rise.arm.in {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  /* Wipe: a hairline sweeps the value in, like a meter settling. */
+  .wipe.arm {
+    clip-path: inset(0 100% 0 0);
+    transition: clip-path 800ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .wipe.arm.in {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Fine engraved noise on the machined panels only (fixed, never on scroll content). */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-grain);
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Tick marks for the instrument rules. */
+.ticks {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-line) 0,
+    var(--color-line) 1px,
+    transparent 1px,
+    transparent 14px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

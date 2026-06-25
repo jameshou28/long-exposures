@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Tooling caches
+.gstack/
+.impeccable/
+
+# Node / landing page
+node_modules/
+landing/dist/
+*.tsbuildinfo
+
+# Xcode user-specific
+xcuserdata/
+*.xcuserstate
+build/
+DerivedData/
