@@ -13,7 +13,7 @@
   --color-line-bright: #343a42; /* emphasized hairline */
   --color-ink: #f1f3f5;         /* primary text, 13.8:1 on base */
   --color-ink-2: #aeb4bc;       /* secondary text, ~6.7:1 on base */
-  --color-ink-3: #6b7178;       /* tertiary / labels, ~3.6:1 (UI/large only) */
+  --color-ink-3: #7f868e;       /* tertiary / mono labels, 5.3:1 base / 5.0:1 panel — clears small-text AA */
   --color-signal: #2d8cff;      /* the icon blue — functional accent only */
   --color-signal-soft: #67a9ff;
 }
