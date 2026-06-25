@@ -56,44 +56,67 @@ kernel void accumulate_average(texture2d<float, access::read>        frame      
     accumulator.write(acc, gid);
 }
 
+// Lighten/darken keep the per-channel extreme in `accumulator.rgb`, and a running
+// average in a parallel `mean` texture (rgb = linear sum, a = frame count). Resolve
+// mixes the average toward the extreme by a fixed strength so the effect is softened
+// instead of pinning every pixel to the single brightest/darkest frame.
 kernel void accumulate_lighten(texture2d<float, access::read>        frame       [[texture(0)]],
                                texture2d<float, access::read_write>  accumulator [[texture(1)]],
+                               texture2d<float, access::read_write>  mean        [[texture(2)]],
                                uint2 gid [[thread_position_in_grid]])
 {
     if (gid.x >= accumulator.get_width() || gid.y >= accumulator.get_height()) { return; }
-    float4 src = frame.read(gid);
+    float3 lin = srgb_to_linear3(frame.read(gid).rgb);
     float4 acc = accumulator.read(gid);
-    acc.rgb = max(acc.rgb, srgb_to_linear3(src.rgb));
+    acc.rgb = max(acc.rgb, lin);
     accumulator.write(acc, gid);
+    float4 m = mean.read(gid);
+    m.rgb += lin;
+    m.a   += 1.0f;
+    mean.write(m, gid);
 }
 
 kernel void accumulate_darken(texture2d<float, access::read>        frame       [[texture(0)]],
                               texture2d<float, access::read_write>  accumulator [[texture(1)]],
+                              texture2d<float, access::read_write>  mean        [[texture(2)]],
                               uint2 gid [[thread_position_in_grid]])
 {
     if (gid.x >= accumulator.get_width() || gid.y >= accumulator.get_height()) { return; }
-    float4 src = frame.read(gid);
+    float3 lin = srgb_to_linear3(frame.read(gid).rgb);
     float4 acc = accumulator.read(gid);
-    acc.rgb = min(acc.rgb, srgb_to_linear3(src.rgb));
+    acc.rgb = min(acc.rgb, lin);
     accumulator.write(acc, gid);
+    float4 m = mean.read(gid);
+    m.rgb += lin;
+    m.a   += 1.0f;
+    mean.write(m, gid);
 }
 
 // --- Resolve --------------------------------------------------------------
 //
 // Converts the linear accumulator to an sRGB BGRA8 output texture.
-// divideByCount: 1 for average (divide rgb by acc.a), 0 for lighten/darken.
+// divideByCount: 1 for average (divide acc.rgb by acc.a), 0 for lighten/darken.
+// For lighten/darken, the per-pixel average lives in `mean` (rgb = sum, a = count)
+// and `strength` (0..1) blends that average toward the extreme so the effect is
+// dialed back from the full, often-harsh max/min.
 
 kernel void resolve(texture2d<float, access::read>   accumulator [[texture(0)]],
                     texture2d<float, access::write>  outTexture  [[texture(1)]],
+                    texture2d<float, access::read>   mean        [[texture(2)]],
                     constant uint& divideByCount                 [[buffer(0)]],
+                    constant float& strength                     [[buffer(1)]],
                     uint2 gid [[thread_position_in_grid]])
 {
     if (gid.x >= outTexture.get_width() || gid.y >= outTexture.get_height()) { return; }
     float4 acc = accumulator.read(gid);
-    float3 linearColor = acc.rgb;
+    float3 linearColor;
     if (divideByCount != 0) {
         float count = max(acc.a, 1.0f);
-        linearColor /= count;
+        linearColor = acc.rgb / count;
+    } else {
+        float4 m = mean.read(gid);
+        float3 avg = m.rgb / max(m.a, 1.0f);
+        linearColor = mix(avg, acc.rgb, strength);
     }
     float3 srgb = saturate(linear_to_srgb3(linearColor));
     outTexture.write(float4(srgb, 1.0f), gid);

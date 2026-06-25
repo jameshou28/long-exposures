@@ -118,8 +118,7 @@ function SectionLabel({ index, name }: { index: string; name: string }) {
 
 const LINKS = [
   { label: "Frames", href: "#frames" },
-  { label: "Modes", href: "#modes" },
-  { label: "Control", href: "#control" },
+  { label: "Controls", href: "#control" },
   { label: "On device", href: "#device" },
 ];
 
@@ -205,6 +204,110 @@ function Nav() {
         </a>
       </div>
     </>
+  );
+}
+
+/* ==================== BEFORE / AFTER SLIDER ==================== *
+ *  Drag the divider to wipe between two app screenshots — Align   *
+ *  off (smeary) vs on (sharp). Pointer + keyboard accessible.     *
+ * ============================================================== */
+
+function BeforeAfterSlider({
+  before,
+  after,
+  beforeAlt,
+  afterAlt,
+  beforeLabel,
+  afterLabel,
+}: {
+  before: string;
+  after: string;
+  beforeAlt: string;
+  afterAlt: string;
+  beforeLabel: string;
+  afterLabel: string;
+}) {
+  const [pos, setPos] = useState(50); // divider position, 0–100
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const dragging = useRef(false);
+
+  useEffect(() => {
+    const setFromClientX = (clientX: number) => {
+      const el = frameRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const t = Math.min(100, Math.max(0, ((clientX - r.left) / r.width) * 100));
+      setPos(t);
+    };
+    const move = (e: PointerEvent) => {
+      if (!dragging.current) return;
+      e.preventDefault();
+      setFromClientX(e.clientX);
+    };
+    const up = () => (dragging.current = false);
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, []);
+
+  const onKey = (e: React.KeyboardEvent) => {
+    const step = e.shiftKey ? 10 : 4;
+    if (e.key === "ArrowLeft") { e.preventDefault(); setPos((p) => Math.max(0, p - step)); }
+    if (e.key === "ArrowRight") { e.preventDefault(); setPos((p) => Math.min(100, p + step)); }
+  };
+
+  return (
+    <div className="border border-line bg-panel">
+      <div
+        ref={frameRef}
+        className="relative w-full touch-none select-none overflow-hidden bg-base"
+        style={{ aspectRatio: "9 / 16", maxHeight: "70vh" }}
+      >
+        {/* AFTER (aligned) fills the frame; BEFORE is clipped on top from the left. */}
+        <img src={after} alt={afterAlt} draggable={false} className="absolute inset-0 h-full w-full object-contain" />
+        <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}>
+          <img src={before} alt={beforeAlt} draggable={false} className="absolute inset-0 h-full w-full object-contain" />
+        </div>
+
+        {/* corner labels */}
+        <span className="pointer-events-none absolute left-3 top-3 bg-base/70 px-2 py-1 backdrop-blur-sm">
+          <Mono className="text-ink-2">{beforeLabel}</Mono>
+        </span>
+        <span className="pointer-events-none absolute right-3 top-3 bg-base/70 px-2 py-1 backdrop-blur-sm">
+          <Mono className="text-signal-soft">{afterLabel}</Mono>
+        </span>
+
+        {/* divider + machined handle */}
+        <div className="pointer-events-none absolute inset-y-0" style={{ left: `${pos}%`, transform: "translateX(-50%)" }}>
+          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-signal/90 shadow-[0_0_12px_rgba(45,140,255,0.6)]" />
+          <button
+            role="slider"
+            aria-label="Reveal aligned vs unaligned"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(pos)}
+            tabIndex={0}
+            onKeyDown={onKey}
+            onPointerDown={(e) => {
+              (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+              dragging.current = true;
+            }}
+            className="pointer-events-auto absolute top-1/2 left-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-signal bg-base/90 outline-none ring-signal-soft backdrop-blur-sm focus-visible:ring-2"
+          >
+            <Glyph d="M10 8 L6 12 L10 16 M14 8 L18 12 L14 16" className="h-5 w-5 text-signal-soft" />
+          </button>
+        </div>
+      </div>
+
+      <p className="border-t border-line px-4 py-3 text-[13px] text-ink-2 sm:px-5">
+        Drag the divider. Left: frames blended raw — handheld shake smears the whole scene.
+        Right: <span className="text-ink">Align frames</span> on — the static background snaps
+        sharp while the lights keep their trails.
+      </p>
+    </div>
   );
 }
 
@@ -568,31 +671,47 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ============ MODES ============ */}
-        <section id="modes" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 md:py-32">
-          <Rise className="mb-12 max-w-3xl">
-            <SectionLabel index="③" name="Three ways to combine" />
-            <h2 className="mt-6 font-display text-[clamp(2.25rem,5vw,3.5rem)] font-bold leading-[0.98] text-ink">
-              One clip. Three different photographs.
-            </h2>
-          </Rise>
-          <Rise>
-            <ModeSwitch />
-          </Rise>
-        </section>
-
-        {/* ============ CONTROL / fine adjustments ============ */}
+        {/* ============ CONTROL / modes + fine adjustments ============ */}
         <section id="control" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 md:py-36">
           <Rise className="mb-12 max-w-3xl">
-            <SectionLabel index="④" name="The fine controls" />
+            <SectionLabel index="③" name="The controls" />
             <h2 className="mt-6 font-display text-[clamp(2.25rem,5vw,3.5rem)] font-bold leading-[0.98] text-ink">
               The dials a real long exposure needs.
             </h2>
           </Rise>
 
-          <div className="grid gap-px border border-line bg-line lg:grid-cols-3">
+          {/* Blend mode — one clip, three photographs */}
+          <Rise className="mb-px">
+            <ModeSwitch />
+          </Rise>
+
+          {/* Align — shown as a live before/after wipe */}
+          <Rise className="grid items-stretch gap-px border border-t-0 border-line bg-line lg:grid-cols-[1fr_minmax(0,0.85fr)]">
+            <div className="flex flex-col justify-center gap-5 bg-panel p-7 sm:p-10">
+              <Glyph d="M4 4 H14 V14 H4 Z M10 10 H20 V20 H10 Z" className="h-7 w-7 text-signal-soft" />
+              <h3 className="font-display text-[clamp(1.75rem,4vw,2.75rem)] font-bold leading-tight text-ink">
+                Align handheld shots without a tripod.
+              </h3>
+              <p className="prose-pretty text-[15px] leading-relaxed text-ink-2">
+                On-device registration locks the static background sharp while moving subjects
+                keep their blur. Drag the divider on a real shot — same 67 frames, Align off
+                versus on.
+              </p>
+            </div>
+            <div className="bg-panel p-3 sm:p-4">
+              <BeforeAfterSlider
+                before="/screenshots/align-off.png"
+                after="/screenshots/align-on.png"
+                beforeAlt="Long Exposures editor with Align frames off — the blended night street is a smeared, doubled blur from handheld shake"
+                afterAlt="Long Exposures editor with Align frames on — the same night street is sharp, with clean light trails from the cars"
+                beforeLabel="Align off"
+                afterLabel="Align on"
+              />
+            </div>
+          </Rise>
+
+          <div className="mt-px grid gap-px border border-t-0 border-line bg-line lg:grid-cols-2">
             {[
-              { name: "Align handheld shots", icon: "M4 4 H14 V14 H4 Z M10 10 H20 V20 H10 Z", body: "On-device registration locks the static background sharp while moving subjects blur. Shoot without a tripod." },
               { name: "Match exposure", icon: "M12 7 a5 5 0 1 0 0 10 a5 5 0 1 0 0 -10 M12 2 V4 M12 20 V22 M2 12 H4 M20 12 H22", body: "Evens out the brightness flicker the camera bakes in between frames, so the blend stays clean instead of pulsing." },
               { name: "Hold to compare", icon: "M12 4 V20 M4 6 H10 V18 H4 Z M14 6 H20 V18 H14 Z", body: "Press the preview to flip to a single sharp frame and see exactly what the exposure added." },
             ].map((f, i) => (
@@ -626,7 +745,7 @@ export function LandingPage() {
         <section id="device" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 md:py-36">
           <Rise>
             <div className="border border-line bg-panel p-8 sm:p-12 md:p-16">
-              <SectionLabel index="⑤" name="On device" />
+              <SectionLabel index="④" name="On device" />
               <h2 className="mt-7 max-w-3xl font-display text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold leading-[0.95] text-ink">
                 Your photos never leave the phone.
               </h2>

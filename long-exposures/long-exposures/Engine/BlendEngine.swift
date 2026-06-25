@@ -35,6 +35,11 @@ enum BlendMode: String, CaseIterable {
 
     /// Lighten/darken seed the accumulator with the first frame rather than zero.
     var seedsWithFirstFrame: Bool { self != .average }
+
+    /// How far the resolved lighten/darken result is pushed toward the raw max/min,
+    /// versus the running average. 1.0 = full (harsh) effect, 0 = plain average.
+    /// Pulled back from full so light trails / shadow crush aren't so extreme.
+    var strength: Float { self == .average ? 1.0 : 0.7 }
 }
 
 enum BlendError: LocalizedError {
@@ -159,6 +164,12 @@ final class BlendEngine {
         let accumulator = try makeAccumulator(width: width, height: height)
         let accumulatePipeline = try accumulatePipeline(for: mode)
 
+        // Lighten/darken also keep a running average (in `mean`) so resolve can pull
+        // the harsh max/min back toward it. Average mode doesn't need it.
+        let mean: MTLTexture? = mode.seedsWithFirstFrame
+            ? try makeAccumulator(width: width, height: height)
+            : nil
+
         guard let commandBuffer = commandQueue.makeCommandBuffer() else {
             throw BlendError.commandEncodingFailed
         }
@@ -168,7 +179,7 @@ final class BlendEngine {
         // from the zero-filled accumulator and includes every frame below.
         let framesToAccumulate: ArraySlice<CVPixelBuffer>
         if mode.seedsWithFirstFrame {
-            try seed(accumulator: accumulator, with: first, on: commandBuffer)
+            try seed(accumulator: accumulator, mean: mean, with: first, on: commandBuffer)
             framesToAccumulate = frames[1...]
         } else {
             framesToAccumulate = frames[0...]
@@ -184,12 +195,13 @@ final class BlendEngine {
             encoder.setComputePipelineState(accumulatePipeline)
             encoder.setTexture(frameTexture, index: 0)
             encoder.setTexture(accumulator, index: 1)
+            if let mean { encoder.setTexture(mean, index: 2) }
             dispatch(encoder, pipeline: accumulatePipeline, width: width, height: height)
             encoder.endEncoding()
         }
 
         let output = try makeOutputTexture(width: width, height: height)
-        try encodeResolve(accumulator: accumulator, output: output, mode: mode, on: commandBuffer)
+        try encodeResolve(accumulator: accumulator, mean: mean, output: output, mode: mode, on: commandBuffer)
 
         commandBuffer.commit()
         commandBuffer.waitUntilCompleted()
@@ -203,10 +215,11 @@ final class BlendEngine {
 
     // MARK: - Seeding (lighten/darken)
 
-    private func seed(accumulator: MTLTexture, with frame: CVPixelBuffer, on commandBuffer: MTLCommandBuffer) throws {
+    private func seed(accumulator: MTLTexture, mean: MTLTexture?, with frame: CVPixelBuffer, on commandBuffer: MTLCommandBuffer) throws {
         // The accumulator is zero-cleared and linear frame values are >= 0, so running the
         // lighten (max) kernel once writes the first frame's linear values verbatim. Both
-        // lighten and darken use this to start max/min from real data rather than 0.
+        // lighten and darken use this to start max/min from real data rather than 0. It also
+        // seeds the running average (mean.rgb = first frame, mean.a = 1).
         guard let frameTexture = makeReadTexture(from: frame) else {
             throw BlendError.textureAllocationFailed
         }
@@ -217,21 +230,27 @@ final class BlendEngine {
         encoder.setComputePipelineState(pipeline)
         encoder.setTexture(frameTexture, index: 0)
         encoder.setTexture(accumulator, index: 1)
+        if let mean { encoder.setTexture(mean, index: 2) }
         dispatch(encoder, pipeline: pipeline, width: accumulator.width, height: accumulator.height)
         encoder.endEncoding()
     }
 
     // MARK: - Resolve
 
-    private func encodeResolve(accumulator: MTLTexture, output: MTLTexture, mode: BlendMode, on commandBuffer: MTLCommandBuffer) throws {
+    private func encodeResolve(accumulator: MTLTexture, mean: MTLTexture?, output: MTLTexture, mode: BlendMode, on commandBuffer: MTLCommandBuffer) throws {
         guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
             throw BlendError.commandEncodingFailed
         }
         encoder.setComputePipelineState(resolvePipeline)
         encoder.setTexture(accumulator, index: 0)
         encoder.setTexture(output, index: 1)
+        // For average, `mean` is nil; the kernel ignores texture 2 in that branch, but a
+        // binding must still exist — reuse the accumulator as a harmless placeholder.
+        encoder.setTexture(mean ?? accumulator, index: 2)
         var divide: UInt32 = mode.dividesByCount ? 1 : 0
         encoder.setBytes(&divide, length: MemoryLayout<UInt32>.size, index: 0)
+        var strength = mode.strength
+        encoder.setBytes(&strength, length: MemoryLayout<Float>.size, index: 1)
         dispatch(encoder, pipeline: resolvePipeline, width: output.width, height: output.height)
         encoder.endEncoding()
     }
