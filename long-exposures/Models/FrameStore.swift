@@ -10,6 +10,7 @@ import Foundation
 import CoreVideo
 import CoreImage
 import Observation
+import UIKit
 
 @Observable
 @MainActor
@@ -31,6 +32,21 @@ final class FrameStore {
     func clear() {
         fullResolutionFrames = []
         previewFrames = []
+    }
+
+    /// Small UIImages of each preview frame for the timeline strip.
+    func makeThumbnails(longEdge: CGFloat = 96) -> [UIImage] {
+        previewFrames.map { buffer in
+            let width = CVPixelBufferGetWidth(buffer)
+            let height = CVPixelBufferGetHeight(buffer)
+            let scale = min(1.0, longEdge / CGFloat(max(width, height)))
+            let ci = CIImage(cvPixelBuffer: buffer)
+                .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+            guard let cg = ciContext.createCGImage(ci, from: ci.extent) else {
+                return UIImage()
+            }
+            return UIImage(cgImage: cg)
+        }
     }
 
     private func downsample(_ buffer: CVPixelBuffer) -> CVPixelBuffer {

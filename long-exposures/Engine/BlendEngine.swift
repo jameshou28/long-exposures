@@ -70,6 +70,20 @@ final class BlendEngine {
     private var accumulatePipelines: [String: MTLComputePipelineState] = [:]
     private var resolvePipeline: MTLComputePipelineState!
 
+    /// Caches rendered results so revisiting a range during a drag is instant.
+    /// Keyed by mode + range + frame-set identity. Bounded; oldest entries drop.
+    private struct CacheKey: Hashable {
+        let mode: String
+        let lowerBound: Int
+        let upperBound: Int
+        let generation: Int
+    }
+    private var resultCache: [CacheKey: CGImage] = [:]
+    private var cacheOrder: [CacheKey] = []
+    private let cacheLimit = 64
+    /// Bumped whenever the frame set changes so stale cache entries can't collide.
+    private var generation = 0
+
     init() throws {
         guard let device = MTLCreateSystemDefaultDevice() else { throw BlendError.metalUnavailable }
         guard let queue = device.makeCommandQueue() else { throw BlendError.metalUnavailable }
@@ -100,6 +114,39 @@ final class BlendEngine {
         let pipeline = try makePipeline(named: mode.kernelName)
         accumulatePipelines[mode.kernelName] = pipeline
         return pipeline
+    }
+
+    /// Call when the underlying frame set changes (new import) so cached results
+    /// for the previous frames are never returned for the new ones.
+    func invalidateCache() {
+        generation += 1
+        resultCache.removeAll(keepingCapacity: true)
+        cacheOrder.removeAll(keepingCapacity: true)
+    }
+
+    /// Blends a contiguous range of frames, caching the result per (mode, range).
+    /// Used by the interactive editor: dragging back to a prior range is instant.
+    func blend(frames: [CVPixelBuffer], range: ClosedRange<Int>, mode: BlendMode) throws -> CGImage {
+        guard !frames.isEmpty else { throw BlendError.noFrames }
+        let lower = max(0, range.lowerBound)
+        let upper = min(frames.count - 1, range.upperBound)
+        guard lower <= upper else { throw BlendError.noFrames }
+
+        let key = CacheKey(mode: mode.kernelName, lowerBound: lower, upperBound: upper, generation: generation)
+        if let cached = resultCache[key] { return cached }
+
+        let image = try blend(frames: Array(frames[lower...upper]), mode: mode)
+        store(image, for: key)
+        return image
+    }
+
+    private func store(_ image: CGImage, for key: CacheKey) {
+        resultCache[key] = image
+        cacheOrder.append(key)
+        if cacheOrder.count > cacheLimit {
+            let evicted = cacheOrder.removeFirst()
+            resultCache.removeValue(forKey: evicted)
+        }
     }
 
     /// Blends the given BGRA frames into a single long-exposure CGImage.
