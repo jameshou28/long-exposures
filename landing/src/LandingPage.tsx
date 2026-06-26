@@ -552,9 +552,10 @@ export function LandingPage() {
             <div className="lg:col-span-5">
               <Rise style={{ transitionDelay: "160ms" }}>
                 <HeroResult
-                  alt="A finished long exposure — e.g. silky water or night light trails, exported from the app"
-                  frames={67}
-                  exposure="ƒ/16 · 4.0s"
+                  src="/exposures/hero.jpg"
+                  alt="View of a busy street at night"
+                  frames={167}
+                  exposure="15s"
                 />
               </Rise>
             </div>
