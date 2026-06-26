@@ -4,8 +4,7 @@
 
 <h1>Long Exposures</h1>
 
-<p><strong>Turn your Live Photos and videos into real long-exposure photographs.</strong><br/>
-You pick the frames. Your iPhone does the rest.</p>
+<p><strong>Turn your Live Photos and videos into real long-exposure photographs.</strong><br/></p>
 
 <p>
   <img src="https://img.shields.io/badge/iOS-17%2B-black?style=flat-square" alt="iOS 17+"/>
