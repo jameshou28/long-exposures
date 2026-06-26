@@ -2,13 +2,13 @@
 //  EditorViewModel.swift
 //  long-exposures
 //
-//  Phase 3: drives the interactive editor. Holds the selected frame range and
-//  blend mode, regenerates the preview on the preview-res frames when the
-//  selection changes, and exposes thumbnails for the timeline strip.
+//  Drives the interactive editor. Holds the selected frame range and blend mode,
+//  regenerates the preview on the preview-res frames when the selection changes,
+//  and exposes thumbnails for the timeline strip.
 //
 //  Interaction blends at preview resolution; the BlendEngine caches per range
 //  so dragging back over a visited range is instant. Full-res render happens
-//  only on export (Phase 4).
+//  only on export.
 //
 
 import Foundation
@@ -41,7 +41,7 @@ final class EditorViewModel {
     var isBlending = false
     var previewError: String?
 
-    /// Aligns handheld frames so the static background stays sharp (Phase 5).
+    /// Aligns handheld frames so the static background stays sharp.
     /// Alignment is computed around the *centre of the current selection*, so the
     /// part of the scene being blended is what stays sharp.
     var registrationEnabled = false {
@@ -55,7 +55,7 @@ final class EditorViewModel {
     var isRegistering = false
 
     /// Matches per-frame brightness and white balance to the selection's centre
-    /// frame, removing the pulsing/banding the camera's re-metering causes (Phase 6).
+    /// frame, removing the pulsing/banding the camera's re-metering causes.
     var normalizationEnabled = false {
         didSet {
             guard normalizationEnabled != oldValue else { return }

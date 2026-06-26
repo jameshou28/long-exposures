@@ -2,7 +2,7 @@
 //  CaptureView.swift
 //  long-exposures
 //
-//  Phase 7: the in-app capture screen. Live preview with a record button; locks
+//  The in-app capture screen. Live preview with a record button; locks
 //  exposure and white balance on record so frames stay consistent. On stop, the
 //  captured frames are handed back to be ingested into the same FrameStore as an
 //  imported clip.

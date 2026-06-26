@@ -2,7 +2,7 @@
 //  FrameDebugWriter.swift
 //  long-exposures
 //
-//  Phase 1 debug helper: writes every extracted frame as a PNG to a temp subdirectory.
+//  Debug helper: writes every extracted frame as a PNG to a temp subdirectory.
 //  Used to confirm decode is producing what we expect.
 //
 

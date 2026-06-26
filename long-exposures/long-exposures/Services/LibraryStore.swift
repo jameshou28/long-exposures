@@ -2,7 +2,7 @@
 //  LibraryStore.swift
 //  long-exposures
 //
-//  Phase 4: the in-app library of saved long exposures. Images are JPEGs in
+//  The in-app library of saved long exposures. Images are JPEGs in
 //  Documents/Exposures; metadata is a single index.json alongside them. Fully
 //  on-device, independent of the system Photos library.
 //

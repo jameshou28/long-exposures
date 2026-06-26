@@ -2,7 +2,7 @@
 //  CapturePreview.swift
 //  long-exposures
 //
-//  Phase 7: a thin SwiftUI wrapper around AVCaptureVideoPreviewLayer so the
+//  A thin SwiftUI wrapper around AVCaptureVideoPreviewLayer so the
 //  capture screen can show the live camera feed.
 //
 

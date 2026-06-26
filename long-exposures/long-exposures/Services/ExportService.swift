@@ -2,7 +2,7 @@
 //  ExportService.swift
 //  long-exposures
 //
-//  Phase 4: renders the selected range at full resolution and saves it. Two
+//  Renders the selected range at full resolution and saves it. Two
 //  destinations: the in-app library (always) and the system Photos library
 //  (on request). Full-res blend bypasses the preview cache.
 //

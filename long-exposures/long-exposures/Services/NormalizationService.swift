@@ -2,7 +2,7 @@
 //  NormalizationService.swift
 //  long-exposures
 //
-//  Phase 6: removes brightness and white-balance flicker across frames. The
+//  Removes brightness and white-balance flicker across frames. The
 //  camera re-meters during capture, so frame-to-frame luminance and colour drift
 //  cause banding and pulsing in the blend. We match every frame to the reference.
 //

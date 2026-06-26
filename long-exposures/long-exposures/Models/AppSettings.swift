@@ -2,7 +2,7 @@
 //  AppSettings.swift
 //  long-exposures
 //
-//  Phase 8: user defaults for the editor — the blend mode and export resolution
+//  User defaults for the editor — the blend mode and export resolution
 //  a new edit starts with. Persisted in UserDefaults; read once when an editor is
 //  created so a fresh import lands on the user's preferred settings.
 //

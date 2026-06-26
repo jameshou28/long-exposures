@@ -2,7 +2,7 @@
 //  CaptureService.swift
 //  long-exposures
 //
-//  Phase 7: in-app capture with locked exposure and white balance. Locked capture
+//  In-app capture with locked exposure and white balance. Locked capture
 //  produces consistent frames, which sidesteps the exposure-flicker problem
 //  normalization solves for imported clips.
 //

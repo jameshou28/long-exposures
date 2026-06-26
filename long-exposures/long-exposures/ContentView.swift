@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  long-exposures
 //
-//  Phase 3: import a Live Photo, then drive the interactive editor.
+//  Root view: import a Live Photo or video, then drive the interactive editor.
 //
 
 import SwiftUI

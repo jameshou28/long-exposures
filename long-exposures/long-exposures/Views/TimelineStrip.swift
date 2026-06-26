@@ -2,7 +2,7 @@
 //  TimelineStrip.swift
 //  long-exposures
 //
-//  Phase 3: a strip of frame thumbnails with two range handles. Dragging a
+//  A strip of frame thumbnails with two range handles. Dragging a
 //  handle changes which frames blend. The selection band dims the excluded
 //  frames so the included range reads clearly.
 //

@@ -2,7 +2,7 @@
 //  EditorView.swift
 //  long-exposures
 //
-//  Phase 3: the interactive editor. Preview canvas on top, mode picker, and a
+//  The interactive editor. Preview canvas on top, mode picker, and a
 //  timeline strip with range handles below. Dragging the handles re-blends the
 //  selected frames live (at preview resolution).
 //

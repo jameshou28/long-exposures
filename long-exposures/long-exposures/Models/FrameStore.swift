@@ -2,14 +2,13 @@
 //  FrameStore.swift
 //  long-exposures
 //
-//  Phase 1: holds full-res CVPixelBuffers plus a downsampled preview-res copy of each.
+//  Holds full-res CVPixelBuffers plus a downsampled preview-res copy of each.
 //  Preview frames drive interactive blending; full-res frames are used on export.
 //
-//  Phase 5 (registration): alignment is computed per *selection*, not per clip.
-//  The reference frame is the centre of the current selection, so the part of the
-//  scene the user is actually blending stays sharp. Transforms are cached per
-//  reference index, so dragging the far handle (which leaves the centre put)
-//  doesn't recompute Vision.
+//  Alignment is computed per *selection*, not per clip. The reference frame is
+//  the centre of the current selection, so the part of the scene the user is
+//  actually blending stays sharp. Transforms are cached per reference index, so
+//  dragging the far handle (which leaves the centre put) doesn't recompute Vision.
 //
 
 import Foundation

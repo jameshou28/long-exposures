@@ -2,7 +2,7 @@
 //  Exposure.swift
 //  long-exposures
 //
-//  Phase 4: a saved long-exposure in the in-app library. The image lives as a
+//  A saved long-exposure in the in-app library. The image lives as a
 //  JPEG in the app's Documents/Exposures directory; this is its metadata sidecar.
 //
 

@@ -448,8 +448,19 @@ function ModeSwitch() {
   const mode = MODES[active];
 
   return (
-    <div className="grid gap-px overflow-hidden border border-line bg-line md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-      {/* left: selector + copy */}
+    <div className="grid gap-px overflow-hidden border border-line bg-line md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      {/* left: the result frame for the active mode */}
+      <FrameSlot
+        key={mode.id}
+        alt={`${mode.name} result — drop a long exposure shot rendered in ${mode.name} mode here`}
+        caption={`${mode.name} result`}
+        mode={mode.name.toUpperCase()}
+        exposure="ƒ/16 · 4.0s"
+        aspect="auto"
+        className="min-h-[20rem] border-0"
+      />
+
+      {/* right: selector + copy */}
       <div className="flex flex-col bg-panel p-6 sm:p-8">
         <Mono className="text-ink-3">Blend mode</Mono>
 
@@ -485,17 +496,6 @@ function ModeSwitch() {
           {mode.body}
         </p>
       </div>
-
-      {/* right: the result frame for the active mode */}
-      <FrameSlot
-        key={mode.id}
-        alt={`${mode.name} result — drop a long exposure shot rendered in ${mode.name} mode here`}
-        caption={`${mode.name} result`}
-        mode={mode.name.toUpperCase()}
-        exposure="ƒ/16 · 4.0s"
-        aspect="auto"
-        className="min-h-[20rem] border-0"
-      />
     </div>
   );
 }
@@ -608,13 +608,8 @@ export function LandingPage() {
             </h2>
           </Rise>
 
-          {/* Blend mode — one clip, three photographs */}
-          <Rise className="mb-px">
-            <ModeSwitch />
-          </Rise>
-
           {/* Align — shown as a live before/after wipe */}
-          <Rise className="grid items-stretch gap-px border border-t-0 border-line bg-line lg:grid-cols-[1fr_minmax(0,0.85fr)]">
+          <Rise className="grid items-stretch gap-px border border-line bg-line lg:grid-cols-[1fr_minmax(0,0.85fr)]">
             <div className="flex flex-col justify-center gap-5 bg-panel p-7 sm:p-10">
               <Glyph d="M4 4 H14 V14 H4 Z M10 10 H20 V20 H10 Z" className="h-7 w-7 text-signal-soft" />
               <h3 className="font-display text-[clamp(1.75rem,4vw,2.75rem)] font-bold leading-tight text-ink">
@@ -636,6 +631,11 @@ export function LandingPage() {
                 afterLabel="Align on"
               />
             </div>
+          </Rise>
+
+          {/* Blend mode — one clip, three photographs */}
+          <Rise className="[&>div]:border-t-0">
+            <ModeSwitch />
           </Rise>
 
           <div className="mt-px grid gap-px border border-t-0 border-line bg-line lg:grid-cols-2">

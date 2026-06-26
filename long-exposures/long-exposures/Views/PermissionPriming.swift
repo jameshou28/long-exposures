@@ -2,7 +2,7 @@
 //  PermissionPriming.swift
 //  long-exposures
 //
-//  Phase 8: a friendly explainer shown *before* the cold system permission prompt,
+//  A friendly explainer shown *before* the cold system permission prompt,
 //  so the user understands why access is needed and taps "Continue" intentionally
 //  rather than reflexively declining an unexplained prompt.
 //

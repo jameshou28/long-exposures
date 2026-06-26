@@ -2,7 +2,7 @@
 //  ShareSheet.swift
 //  long-exposures
 //
-//  Phase 4: thin wrapper around UIActivityViewController for the system share sheet.
+//  Thin wrapper around UIActivityViewController for the system share sheet.
 //
 
 import SwiftUI

@@ -2,7 +2,7 @@
 //  OnboardingView.swift
 //  long-exposures
 //
-//  Phase 8: a short first-launch intro explaining the concept — pick a clip, drag
+//  A short first-launch intro explaining the concept — pick a clip, drag
 //  to choose which frames blend, and the blend modes. Shown once (gated on
 //  AppSettings.hasSeenOnboarding); re-openable from Settings.
 //

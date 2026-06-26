@@ -2,7 +2,7 @@
 //  BlendEngine.swift
 //  long-exposures
 //
-//  Phase 2: the core. Reduces N frames into one long-exposure image with a
+//  The core blend engine. Reduces N frames into one long-exposure image with a
 //  selectable blend mode, accumulating in linear light in a float32 texture.
 //
 //  Pipeline per blend:

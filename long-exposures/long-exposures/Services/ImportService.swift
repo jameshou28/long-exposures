@@ -2,7 +2,7 @@
 //  ImportService.swift
 //  long-exposures
 //
-//  Phase 1: pulls frames out of a Live Photo (or any video) as BGRA pixel buffers.
+//  Pulls frames out of a Live Photo (or any video) as BGRA pixel buffers.
 //
 
 import Foundation

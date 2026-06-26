@@ -2,7 +2,7 @@
 //  RegistrationService.swift
 //  long-exposures
 //
-//  Phase 5: aligns handheld frames so the static background stays sharp while
+//  Aligns handheld frames so the static background stays sharp while
 //  moving subjects (water, clouds, traffic) keep their blur. Vision computes a
 //  per-frame translation to the reference frame; we apply it with Core Image.
 //

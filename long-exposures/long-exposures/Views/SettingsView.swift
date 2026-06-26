@@ -2,7 +2,7 @@
 //  SettingsView.swift
 //  long-exposures
 //
-//  Phase 8: app defaults — the blend mode and export resolution a new edit starts
+//  App defaults — the blend mode and export resolution a new edit starts
 //  with. Changes persist immediately via AppSettings.
 //
 

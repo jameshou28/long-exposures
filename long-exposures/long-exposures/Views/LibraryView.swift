@@ -2,7 +2,7 @@
 //  LibraryView.swift
 //  long-exposures
 //
-//  Phase 4: the in-app gallery of saved long exposures. Grid of thumbnails;
+//  The in-app gallery of saved long exposures. Grid of thumbnails;
 //  tapping one opens a detail view to share, save to Photos, or delete.
 //
 

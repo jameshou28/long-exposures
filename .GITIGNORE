@@ -15,3 +15,7 @@ xcuserdata/
 *.xcuserstate
 build/
 DerivedData/
+
+CLAUDE.md
+IMPLEMENTATION-PLAN.md
+PRODUCT.md
