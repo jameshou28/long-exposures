@@ -1,44 +1,59 @@
-# Long Exposures
+<div align="center">
 
-An iOS app that turns Live Photos and videos into long-exposure photographs — where **you** pick which frames blend.
+<img src="long-exposures/long-exposures/Assets.xcassets/AppIcon.appiconset/icon_1024.png" width="120" style="border-radius:26px" alt="Long Exposures app icon"/>
 
-Silky water, light trails, motion blur. No tripod. No upload. All on-device.
+<h1>Long Exposures</h1>
+
+<p><strong>Turn your Live Photos and videos into real long-exposure photographs.</strong><br/>
+You pick the frames. Your iPhone does the rest.</p>
+
+<p>
+  <img src="https://img.shields.io/badge/iOS-17%2B-black?style=flat-square" alt="iOS 17+"/>
+  <img src="https://img.shields.io/badge/iPhone-only-black?style=flat-square" alt="iPhone only"/>
+  <img src="https://img.shields.io/badge/on--device-no%20upload-black?style=flat-square" alt="On-device"/>
+  <img src="https://img.shields.io/badge/Swift-SwiftUI%20%2B%20Metal-black?style=flat-square" alt="Swift"/>
+</p>
+
+</div>
+
+---
+
+## What it does
+
+Long Exposures is an iOS app that turns your Live Photos and videos into real long-exposure shots. Pick a frame range. Choose a blend mode. Get motion blur, light trails, or glassy reflections without a tripod.
 
 ---
 
 ## How it works
 
-![Pipeline diagram](long-exposures/docs/pipeline.svg)
+<div align="center">
+<img src="long-exposures/docs/pipeline.svg" width="860" alt="Image pipeline diagram"/>
+</div>
 
-### Pipeline
+<br/>
 
-```
-Input → Extract Frames → Store → [Align] → [Match Exposure] → Select Range → Blend → Export
-```
-
-| Stage | Service | What happens |
-|---|---|---|
-| **Input** | `ImportService` | Live Photo paired video or any video file is decoded to BGRA `CVPixelBuffer` frames via `AVAssetReader`. Long clips are sampled evenly down to 120 frames. Temp files are deleted immediately after decode. |
-| **Store** | `FrameStore` | Raw full-res buffers + a 720px preview copy of each are kept in memory. The preview set drives interactive blending; full-res is used only on export. |
-| **Align** *(optional)* | `RegistrationService` | Vision `VNTranslationalImageRegistrationRequest` estimates a per-frame translation to the selection's centre frame. Computed on preview-res for speed, then rescaled and applied to full-res via Core Image before export. Corrects handheld shake so the background stays sharp while moving subjects blur. |
-| **Match exposure** *(optional)* | `NormalizationService` | Measures each frame's mean linear RGB, derives per-channel gain relative to the centre frame (clamped 0.5–2×), and applies it via `CIColorMatrix`. Kills the pulsing/banding the camera's auto-metering causes. |
-| **Select range** | `TimelineStrip` | A scrollable thumbnail strip with two draggable handles. You choose exactly which frames enter the blend. |
-| **Blend** | `BlendEngine` (Metal) | Frames are accumulated in a `rgba32Float` texture in linear light, then resolved to sRGB. Three modes: **Average** (motion blur), **Lighten** / max (light trails), **Darken** / min. An LRU cache makes revisiting ranges instant during drag. |
-| **Export** | `ExportService` | Full-res blend → `CGImage` → JPEG (quality 0.95). Saved to the in-app library and optionally to system Photos. |
+| Step | What happens |
+|---|---|
+| **Import** | Your Live Photo's paired video (or any video clip) is decoded frame by frame — up to 120 frames, evenly sampled. Temp files are deleted the moment decoding finishes. |
+| **Select** | A scrollable thumbnail strip lets you drag two handles to pick exactly which frames enter the blend. |
+| **Align** | Vision estimates a per-frame translation and snaps the static background sharp, so handheld shake doesn't smear the scene you care about. |
+| **Match exposure** | Per-channel brightness gains correct the camera's auto-metering flicker between frames, so the blend comes out clean rather than banded. |
+| **Blend** | A Metal GPU pipeline accumulates your frames in linear light and resolves them to sRGB. Three modes: **Average** for motion blur, **Lighten** for light trails, **Darken** for reflections and shadows. |
+| **Export** | Full-resolution render → JPEG, saved to the in-app library or straight to Photos. |
 
 ---
 
 ## Features
 
-- **Import** Live Photos or any video from your library
-- **Capture** directly in-app with locked exposure and white balance for consistent frames
-- **Interactive timeline** — drag range handles to pick exactly the frames you want
-- **Three blend modes**: Average · Lighten · Darken
-- **Frame alignment** — Vision-based translation registration for handheld shots
-- **Exposure matching** — normalises brightness flicker between frames
-- **Before / After** — hold the preview to compare the blend with the original frame
+- **Live Photo & video import** — any clip in your library works
+- **In-app capture** with locked exposure and white balance for consistent frames
+- **Interactive timeline** — see every frame, drag to choose your range
+- **Three blend modes** — Average · Lighten · Darken
+- **Frame alignment** — keeps the background sharp on handheld shots
+- **Exposure matching** — kills brightness flicker between frames
+- **Before / After** — hold the preview to compare against the original frame
 - **In-app library** — browse, share, or save past exposures
-- **Fully on-device** — no account, no upload, no network
+- **No account. No upload. No network.** All processing happens on your device.
 
 ---
 
@@ -54,8 +69,7 @@ Input → Extract Frames → Store → [Align] → [Match Exposure] → Select R
 | Photo access | PhotoKit |
 | Capture | AVCaptureSession |
 
-- iOS 17+, iPhone only
-- No third-party packages
+No third-party packages. iOS 17+, iPhone only.
 
 ---
 
@@ -87,11 +101,3 @@ long-exposures/           ← Xcode project
     PermissionPriming.swift ← Pre-permission explanation sheets
 landing/                  ← Marketing site (React + Vite → Vercel)
 ```
-
----
-
-## Building
-
-Open `long-exposures/long-exposures.xcodeproj` in Xcode 15+. No package fetch needed — the project uses system frameworks only.
-
-The blend engine and capture path require a real device. The import flow and library work in the simulator.
