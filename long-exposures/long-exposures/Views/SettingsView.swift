@@ -50,6 +50,11 @@ struct SettingsView: View {
                         Label("Source on GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
                 }
+                if let privacy = URL(string: "https://long-exposures.jameshou28.com/privacy.html") {
+                    Link(destination: privacy) {
+                        Label("Privacy Policy", systemImage: "hand.raised")
+                    }
+                }
             }
         }
         .navigationTitle("Settings")
