@@ -44,6 +44,12 @@ struct SettingsView: View {
             Section("About") {
                 LabeledContent("Processing", value: "On device")
                 LabeledContent("Data collected", value: "None")
+                LabeledContent("Made by", value: "James Hou")
+                if let repo = URL(string: "https://github.com/jameshou28/long-exposures") {
+                    Link(destination: repo) {
+                        Label("Source on GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
+                    }
+                }
             }
         }
         .navigationTitle("Settings")
