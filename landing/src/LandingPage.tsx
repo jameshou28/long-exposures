@@ -448,53 +448,43 @@ function ModeSwitch() {
   const mode = MODES[active];
 
   return (
-    <div className="grid gap-px overflow-hidden border border-line bg-line md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-      {/* left: the result frame for the active mode */}
-      <FrameSlot
-        key={mode.id}
-        alt={`${mode.name} result — drop a long exposure shot rendered in ${mode.name} mode here`}
-        caption={`${mode.name} result`}
-        mode={mode.name.toUpperCase()}
-        exposure="ƒ/16 · 4.0s"
-        aspect="auto"
-        className="min-h-[20rem] border-0"
-      />
-
-      {/* right: selector + copy */}
-      <div className="flex flex-col bg-panel p-6 sm:p-8">
+    <div className="overflow-hidden border border-line bg-panel">
+      <div className="border-b border-line px-7 py-5 sm:px-10">
         <Mono className="text-ink-3">Blend mode</Mono>
+      </div>
 
-        <div className="mt-4 flex flex-col">
-          {MODES.map((m, i) => {
-            const on = i === active;
-            return (
-              <button
-                key={m.id}
-                onClick={() => setActive(i)}
-                className="group flex items-center justify-between border-b border-line py-4 text-left transition-colors duration-300"
-                style={{ transitionTimingFunction: EASE }}
-              >
-                <span className="flex items-baseline gap-3">
-                  <span
-                    className="h-2 w-2 rounded-full transition-all duration-300"
-                    style={{ backgroundColor: on ? "var(--color-signal)" : "var(--color-line-bright)", boxShadow: on ? "0 0 10px var(--color-signal)" : "none" }}
-                  />
-                  <span
-                    className="font-display text-3xl font-bold transition-colors duration-300"
-                    style={{ color: on ? "var(--color-ink)" : "var(--color-ink-3)" }}
-                  >
-                    {m.name}
-                  </span>
+      <div className="grid gap-px bg-line lg:grid-cols-3">
+        {MODES.map((m, i) => {
+          const on = i === active;
+          return (
+            <button
+              key={m.id}
+              onClick={() => setActive(i)}
+              className="flex flex-col gap-4 bg-panel p-7 text-left transition-colors duration-300 sm:p-8"
+              style={{ transitionTimingFunction: EASE }}
+            >
+              <span className="flex items-center gap-3">
+                <span
+                  className="h-2 w-2 rounded-full transition-all duration-300"
+                  style={{ backgroundColor: on ? "var(--color-signal)" : "var(--color-line-bright)", boxShadow: on ? "0 0 10px var(--color-signal)" : "none" }}
+                />
+                <span
+                  className="font-display text-2xl font-bold transition-colors duration-300"
+                  style={{ color: on ? "var(--color-ink)" : "var(--color-ink-3)" }}
+                >
+                  {m.name}
                 </span>
-                <Mono style={{ color: on ? "var(--color-signal-soft)" : "var(--color-ink-3)" }}>{m.use}</Mono>
-              </button>
-            );
-          })}
-        </div>
-
-        <p key={mode.id} className="prose-pretty mt-6 text-[15px] leading-relaxed text-ink-2" style={{ animation: "fadeKey 400ms cubic-bezier(0.22,1,0.36,1)" }}>
-          {mode.body}
-        </p>
+                <Mono className="ml-auto" style={{ color: on ? "var(--color-signal-soft)" : "var(--color-ink-3)" }}>{m.use}</Mono>
+              </span>
+              <p
+                className="text-[14px] leading-relaxed transition-colors duration-300"
+                style={{ color: on ? "var(--color-ink-2)" : "var(--color-ink-3)" }}
+              >
+                {m.body}
+              </p>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -732,7 +722,7 @@ export function LandingPage() {
   );
 }
 
-/* ---- App Store badge ---- */
+/* ---- GitHub release badge ---- */
 function AppStoreBadge({ size = "default" }: { size?: "compact" | "default" | "large" }) {
   const pad = size === "large" ? "px-6 py-4" : size === "compact" ? "px-3 py-1.5" : "px-5 py-3";
   const gap = size === "compact" ? "gap-2" : "gap-3";
@@ -741,17 +731,20 @@ function AppStoreBadge({ size = "default" }: { size?: "compact" | "default" | "l
   const word = size === "large" ? "text-2xl" : size === "compact" ? "text-base" : "text-xl";
   return (
     <a
-      href="#get"
-      aria-label="Download Long Exposures on the App Store"
+      href="https://github.com/jameshou28/long-exposures/releases/tag/1.0"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Download Long Exposures from GitHub Releases"
       className={`group inline-flex items-center ${gap} border border-line-bright bg-ink text-base transition-all duration-300 hover:border-signal active:scale-[0.98] ${pad}`}
       style={{ transitionTimingFunction: EASE }}
     >
+      {/* GitHub mark */}
       <svg viewBox="0 0 24 24" className={logo} fill="currentColor" aria-hidden>
-        <path d="M16.36 12.78c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.62-1.71-3.19-1.73-1.36-.14-2.65.8-3.34.8-.69 0-1.75-.78-2.88-.76-1.48.02-2.85.86-3.61 2.19-1.54 2.67-.39 6.62 1.11 8.79.73 1.06 1.6 2.25 2.74 2.21 1.1-.04 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.08 2.65-2.15.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.29-.88-2.31-3.49zM14.2 6.3c.6-.74 1.01-1.74.9-2.76-.87.04-1.95.59-2.58 1.31-.56.64-1.06 1.69-.93 2.67.98.08 1.99-.49 2.61-1.22z" />
+        <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .267.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
       </svg>
       <span className="flex flex-col leading-none">
-        <span className={`${kicker} font-medium opacity-70`}>Download on the</span>
-        <span className={`font-display font-bold ${word}`}>App Store</span>
+        <span className={`${kicker} font-medium opacity-70`}>Download from</span>
+        <span className={`font-display font-bold ${word}`}>GitHub</span>
       </span>
     </a>
   );
