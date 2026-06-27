@@ -162,7 +162,7 @@ final class BlendEngine {
         let height = CVPixelBufferGetHeight(first)
 
         let accumulator = try makeAccumulator(width: width, height: height)
-        let accumulatePipeline = try accumulatePipeline(for: mode)
+        let modePipeline = try accumulatePipeline(for: mode)
 
         // Lighten/darken also keep a running average (in `mean`) so resolve can pull
         // the harsh max/min back toward it. Average mode doesn't need it.
@@ -174,31 +174,55 @@ final class BlendEngine {
             throw BlendError.commandEncodingFailed
         }
 
+        // All frames accumulate into the same read_write accumulator (and mean),
+        // each dispatch reading what the prior one wrote. That read-modify-write
+        // chain must run in order: a single encoder with a texture memory barrier
+        // between dispatches guarantees each frame's write is visible to the next.
+        // (Separate encoders per frame don't get an automatic barrier on a .private
+        // read_write texture, so dispatches could race — the cause of the ghosted
+        // "doubling" seen on lighten/darken.)
+        guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
+            throw BlendError.commandEncodingFailed
+        }
+
         // Seed lighten/darken with the first frame so max/min start from real data
-        // (a zero seed would pin darken to black and bias lighten). Average starts
-        // from the zero-filled accumulator and includes every frame below.
+        // (a zero seed would leave darken pinned to black, since min(0, x) = 0).
+        // The lighten kernel writes the first frame verbatim (max(0, x) = x) and
+        // initialises the running mean; the rest of the frames then accumulate with
+        // the mode's own kernel. Average has no seed and the loop covers every frame.
         let framesToAccumulate: ArraySlice<CVPixelBuffer>
+        var dispatchedAny = false
         if mode.seedsWithFirstFrame {
-            try seed(accumulator: accumulator, mean: mean, with: first, on: commandBuffer)
+            guard let seedTexture = makeReadTexture(from: first) else {
+                throw BlendError.textureAllocationFailed
+            }
+            let seedPipeline = try accumulatePipeline(for: .lighten)
+            encoder.setComputePipelineState(seedPipeline)
+            encoder.setTexture(seedTexture, index: 0)
+            encoder.setTexture(accumulator, index: 1)
+            if let mean { encoder.setTexture(mean, index: 2) }
+            dispatch(encoder, pipeline: seedPipeline, width: width, height: height)
+            dispatchedAny = true
             framesToAccumulate = frames[1...]
         } else {
             framesToAccumulate = frames[0...]
         }
 
+        encoder.setComputePipelineState(modePipeline)
         for frame in framesToAccumulate {
             guard let frameTexture = makeReadTexture(from: frame) else {
                 throw BlendError.textureAllocationFailed
             }
-            guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
-                throw BlendError.commandEncodingFailed
+            if dispatchedAny {
+                encoder.memoryBarrier(scope: .textures)
             }
-            encoder.setComputePipelineState(accumulatePipeline)
             encoder.setTexture(frameTexture, index: 0)
             encoder.setTexture(accumulator, index: 1)
             if let mean { encoder.setTexture(mean, index: 2) }
-            dispatch(encoder, pipeline: accumulatePipeline, width: width, height: height)
-            encoder.endEncoding()
+            dispatch(encoder, pipeline: modePipeline, width: width, height: height)
+            dispatchedAny = true
         }
+        encoder.endEncoding()
 
         let output = try makeOutputTexture(width: width, height: height)
         try encodeResolve(accumulator: accumulator, mean: mean, output: output, mode: mode, on: commandBuffer)
