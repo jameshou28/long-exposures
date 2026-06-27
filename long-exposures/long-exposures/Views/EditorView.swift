@@ -125,14 +125,8 @@ struct EditorView: View {
 
     private func toggleRow(title: String, caption: String, isOn: Binding<Bool>) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Toggle(isOn: isOn) { Text(title) }
-                    .disabled(model.isRegistering)
-                if model.isRegistering {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-            }
+            Toggle(isOn: isOn) { Text(title) }
+                .disabled(model.isRegistering)
             Text(caption)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -140,12 +134,24 @@ struct EditorView: View {
     }
 
     private var modePicker: some View {
-        Picker("Blend mode", selection: $model.mode) {
-            Text("Average").tag(BlendMode.average)
-            Text("Lighten").tag(BlendMode.lighten)
-            Text("Darken").tag(BlendMode.darken)
+        VStack(spacing: 4) {
+            Slider(value: $model.blendBias, in: -1...1) {
+                Text("Blend")
+            } minimumValueLabel: {
+                Image(systemName: "moon.fill")
+            } maximumValueLabel: {
+                Image(systemName: "sun.max.fill")
+            }
+            HStack {
+                Text("Darken")
+                Spacer()
+                Text("Average")
+                Spacer()
+                Text("Lighten")
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
         }
-        .pickerStyle(.segmented)
     }
 
     private var timelineSection: some View {

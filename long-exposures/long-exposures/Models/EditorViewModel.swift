@@ -25,8 +25,11 @@ final class EditorViewModel {
 
     var thumbnails: [UIImage] = []
     var previewImage: UIImage?
-    var mode: BlendMode = .average {
-        didSet { scheduleBlend() }
+
+    /// Continuous blend control: -1 = darken (min), 0 = average, +1 = lighten (max).
+    /// Replaces the old discrete average/lighten/darken picker.
+    var blendBias: Double = 0 {
+        didSet { if blendBias != oldValue { scheduleBlend() } }
     }
 
     /// Inclusive selected range over preview-frame indices.
@@ -90,7 +93,7 @@ final class EditorViewModel {
         self.frameStore = frameStore
         self.engine = engine
         self.library = library
-        self.mode = settings.defaultMode
+        self.blendBias = Double(settings.defaultMode.bias)
         self.exportResolution = settings.defaultResolution
     }
 
@@ -110,17 +113,17 @@ final class EditorViewModel {
         blendTask?.cancel()
         let start = min(selectionStart, selectionEnd)
         let end = max(selectionStart, selectionEnd)
-        let mode = mode
+        let bias = Float(blendBias)
 
         blendTask = Task { [weak self] in
             // Brief debounce so a fast drag doesn't queue a blend per frame.
             try? await Task.sleep(for: .milliseconds(30))
             guard !Task.isCancelled, let self else { return }
-            await self.blend(start: start, end: end, mode: mode)
+            await self.blend(start: start, end: end, bias: bias)
         }
     }
 
-    private func blend(start: Int, end: Int, mode: BlendMode) async {
+    private func blend(start: Int, end: Int, bias: Float) async {
         guard frameStore.previewFrames.count > 0 else { return }
         isBlending = true
         if processesFramesPerSelection { isRegistering = true }
@@ -137,13 +140,13 @@ final class EditorViewModel {
             if processesFramesPerSelection {
                 let frames = await frameStore.previewFrames(for: start...end)
                 guard !Task.isCancelled, !frames.isEmpty else { return }
-                cgImage = try engine.blend(frames: frames, mode: mode)
+                cgImage = try engine.blend(frames: frames, bias: bias)
                 let cmp = min(compareSliceIndex, frames.count - 1)
                 compareImage = UIImage(cgImage: try engine.render(frame: frames[cmp]))
             } else {
                 let frames = frameStore.previewFrames
                 guard !frames.isEmpty else { return }
-                cgImage = try engine.blend(frames: frames, range: start...end, mode: mode)
+                cgImage = try engine.blend(frames: frames, range: start...end, bias: bias)
                 let absolute = min(start + compareSliceIndex, frames.count - 1)
                 compareImage = UIImage(cgImage: try engine.render(frame: frames[absolute]))
             }
@@ -172,7 +175,8 @@ final class EditorViewModel {
         guard frameStore.fullResolutionFrames.count > 0 else { return }
         let start = min(selectionStart, selectionEnd)
         let end = max(selectionStart, selectionEnd)
-        let mode = mode
+        let bias = Float(blendBias)
+        let label = BlendMode.label(forBias: bias)
         let frameCount = end - start + 1
 
         isExporting = true
@@ -186,8 +190,8 @@ final class EditorViewModel {
             guard !frames.isEmpty else { return }
             let service = ExportService(engine: engine)
             let cgImage = try service.renderFullResolution(
-                frames: frames, range: 0...(frames.count - 1), mode: mode, resolution: exportResolution)
-            try library.add(image: cgImage, mode: mode, frameCount: frameCount)
+                frames: frames, range: 0...(frames.count - 1), bias: bias, resolution: exportResolution)
+            try library.add(image: cgImage, modeLabel: label, frameCount: frameCount)
             if saveToPhotos {
                 try await ExportService.saveToPhotos(cgImage)
                 exportMessage = "Saved to library and Photos."

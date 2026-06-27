@@ -38,7 +38,7 @@ final class LibraryStore {
 
     /// Persists a rendered exposure: writes the JPEG and prepends it to the index.
     @discardableResult
-    func add(image: CGImage, mode: BlendMode, frameCount: Int) throws -> Exposure {
+    func add(image: CGImage, modeLabel: String, frameCount: Int) throws -> Exposure {
         let fileName = "\(UUID().uuidString).jpg"
         let url = directory.appendingPathComponent(fileName)
         guard let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.95) else {
@@ -47,7 +47,7 @@ final class LibraryStore {
         }
         try data.write(to: url)
 
-        let exposure = Exposure(mode: mode.label, frameCount: frameCount, imageFileName: fileName)
+        let exposure = Exposure(mode: modeLabel, frameCount: frameCount, imageFileName: fileName)
         exposures.insert(exposure, at: 0)
         try saveIndex()
         return exposure

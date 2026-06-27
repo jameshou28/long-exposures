@@ -32,4 +32,14 @@ extension BlendMode {
         case .darken:  return "darken"
         }
     }
+
+    /// A human label for a continuous blend bias, for saved-exposure metadata.
+    /// Snaps to the nearest named mode and notes partial strength.
+    static func label(forBias bias: Float) -> String {
+        let b = min(max(bias, -1), 1)
+        if abs(b) < 0.05 { return "average" }
+        let direction = b > 0 ? "lighten" : "darken"
+        let percent = Int((abs(b) * 100).rounded())
+        return percent >= 95 ? direction : "\(direction) \(percent)%"
+    }
 }

@@ -2,14 +2,22 @@
 //  BlendEngine.swift
 //  long-exposures
 //
-//  The core blend engine. Reduces N frames into one long-exposure image with a
-//  selectable blend mode, accumulating in linear light in a float32 texture.
+//  The core blend engine. Reduces N frames into one long-exposure image,
+//  accumulating in linear light in float32 textures.
+//
+//  The blend is a continuous slider rather than discrete modes: a single pass
+//  accumulates the running min, max, and average of every frame at once, and a
+//  signed `bias` in [-1, +1] picks where to land — toward the min (darken) on
+//  the negative side, toward the max (lighten) on the positive side, plain
+//  average at 0.
 //
 //  Pipeline per blend:
-//    1. Allocate a float32 RGBA accumulator at the frame size.
-//    2. Seed it (zero for average, first frame for lighten/darken).
-//    3. For each frame: upload BGRA -> Metal texture, run the accumulate kernel.
-//    4. Resolve the accumulator to an sRGB BGRA8 texture and read back a CGImage.
+//    1. Allocate min/max/sum float32 accumulators at the frame size.
+//    2. Seed them (min -> large, max/sum -> zero).
+//    3. For each frame: upload BGRA -> Metal texture, run the accumulate kernel,
+//       with a memory barrier between frames so the read-modify-write chain runs
+//       in order (separate dispatches on a shared read_write texture otherwise race).
+//    4. Resolve to an sRGB BGRA8 texture with the chosen bias and read back a CGImage.
 //
 
 import Foundation
@@ -22,24 +30,15 @@ enum BlendMode: String, CaseIterable {
     case lighten
     case darken
 
-    var kernelName: String {
+    /// Signed bias on the darken<->average<->lighten axis for this discrete mode.
+    /// The slider uses these as anchors; the value persists for saved exposures.
+    var bias: Float {
         switch self {
-        case .average: return "accumulate_average"
-        case .lighten: return "accumulate_lighten"
-        case .darken:  return "accumulate_darken"
+        case .average: return 0
+        case .lighten: return 1
+        case .darken:  return -1
         }
     }
-
-    /// Whether the resolve step divides the accumulator by the frame count.
-    var dividesByCount: Bool { self == .average }
-
-    /// Lighten/darken seed the accumulator with the first frame rather than zero.
-    var seedsWithFirstFrame: Bool { self != .average }
-
-    /// How far the resolved lighten/darken result is pushed toward the raw max/min,
-    /// versus the running average. 1.0 = full (harsh) effect, 0 = plain average.
-    /// Pulled back from full so light trails / shadow crush aren't so extreme.
-    var strength: Float { self == .average ? 1.0 : 0.7 }
 }
 
 enum BlendError: LocalizedError {
@@ -72,13 +71,17 @@ final class BlendEngine {
     private let textureCache: CVMetalTextureCache
     private let ciContext: CIContext
 
-    private var accumulatePipelines: [String: MTLComputePipelineState] = [:]
+    private var accumulatePipeline: MTLComputePipelineState!
     private var resolvePipeline: MTLComputePipelineState!
 
+    /// Seed value for the min accumulator: larger than any linear colour (which is
+    /// in [0,1] after sRGB->linear), so the first real value always wins the min.
+    private static let minSeed: Float = 1e9
+
     /// Caches rendered results so revisiting a range during a drag is instant.
-    /// Keyed by mode + range + frame-set identity. Bounded; oldest entries drop.
+    /// Keyed by quantized bias + range + frame-set identity. Bounded; oldest drop.
     private struct CacheKey: Hashable {
-        let mode: String
+        let biasBucket: Int
         let lowerBound: Int
         let upperBound: Int
         let generation: Int
@@ -88,6 +91,12 @@ final class BlendEngine {
     private let cacheLimit = 64
     /// Bumped whenever the frame set changes so stale cache entries can't collide.
     private var generation = 0
+
+    /// Bias is continuous; bucket it so near-identical slider positions share a
+    /// cache entry (and so float keys stay stable). 100 buckets over [-1, +1].
+    private static func biasBucket(_ bias: Float) -> Int {
+        Int((min(max(bias, -1), 1) * 50).rounded())
+    }
 
     init() throws {
         guard let device = MTLCreateSystemDefaultDevice() else { throw BlendError.metalUnavailable }
@@ -104,6 +113,7 @@ final class BlendEngine {
         self.textureCache = textureCache
         self.ciContext = CIContext(mtlDevice: device)
 
+        self.accumulatePipeline = try makePipeline(named: "accumulate")
         self.resolvePipeline = try makePipeline(named: "resolve")
     }
 
@@ -114,13 +124,6 @@ final class BlendEngine {
         return try device.makeComputePipelineState(function: function)
     }
 
-    private func accumulatePipeline(for mode: BlendMode) throws -> MTLComputePipelineState {
-        if let cached = accumulatePipelines[mode.kernelName] { return cached }
-        let pipeline = try makePipeline(named: mode.kernelName)
-        accumulatePipelines[mode.kernelName] = pipeline
-        return pipeline
-    }
-
     /// Call when the underlying frame set changes (new import) so cached results
     /// for the previous frames are never returned for the new ones.
     func invalidateCache() {
@@ -129,18 +132,19 @@ final class BlendEngine {
         cacheOrder.removeAll(keepingCapacity: true)
     }
 
-    /// Blends a contiguous range of frames, caching the result per (mode, range).
+    /// Blends a contiguous range of frames, caching the result per (bias, range).
     /// Used by the interactive editor: dragging back to a prior range is instant.
-    func blend(frames: [CVPixelBuffer], range: ClosedRange<Int>, mode: BlendMode) throws -> CGImage {
+    func blend(frames: [CVPixelBuffer], range: ClosedRange<Int>, bias: Float) throws -> CGImage {
         guard !frames.isEmpty else { throw BlendError.noFrames }
         let lower = max(0, range.lowerBound)
         let upper = min(frames.count - 1, range.upperBound)
         guard lower <= upper else { throw BlendError.noFrames }
 
-        let key = CacheKey(mode: mode.kernelName, lowerBound: lower, upperBound: upper, generation: generation)
+        let key = CacheKey(biasBucket: Self.biasBucket(bias),
+                           lowerBound: lower, upperBound: upper, generation: generation)
         if let cached = resultCache[key] { return cached }
 
-        let image = try blend(frames: Array(frames[lower...upper]), mode: mode)
+        let image = try blend(frames: Array(frames[lower...upper]), bias: bias)
         store(image, for: key)
         return image
     }
@@ -154,62 +158,32 @@ final class BlendEngine {
         }
     }
 
-    /// Blends the given BGRA frames into a single long-exposure CGImage.
-    func blend(frames: [CVPixelBuffer], mode: BlendMode) throws -> CGImage {
+    /// Blends the given BGRA frames into a single long-exposure CGImage at `bias`.
+    func blend(frames: [CVPixelBuffer], bias: Float) throws -> CGImage {
         guard let first = frames.first else { throw BlendError.noFrames }
 
         let width = CVPixelBufferGetWidth(first)
         let height = CVPixelBufferGetHeight(first)
 
-        let accumulator = try makeAccumulator(width: width, height: height)
-        let modePipeline = try accumulatePipeline(for: mode)
-
-        // Lighten/darken also keep a running average (in `mean`) so resolve can pull
-        // the harsh max/min back toward it. Average mode doesn't need it.
-        let mean: MTLTexture? = mode.seedsWithFirstFrame
-            ? try makeAccumulator(width: width, height: height)
-            : nil
+        let minTex = try makeAccumulator(width: width, height: height, fill: Self.minSeed)
+        let maxTex = try makeAccumulator(width: width, height: height, fill: 0)
+        let sumTex = try makeAccumulator(width: width, height: height, fill: 0)
 
         guard let commandBuffer = commandQueue.makeCommandBuffer() else {
             throw BlendError.commandEncodingFailed
         }
 
-        // All frames accumulate into the same read_write accumulator (and mean),
-        // each dispatch reading what the prior one wrote. That read-modify-write
-        // chain must run in order: a single encoder with a texture memory barrier
-        // between dispatches guarantees each frame's write is visible to the next.
-        // (Separate encoders per frame don't get an automatic barrier on a .private
-        // read_write texture, so dispatches could race — the cause of the ghosted
-        // "doubling" seen on lighten/darken.)
+        // All frames accumulate into the same read_write textures, each dispatch
+        // reading what the prior one wrote. That read-modify-write chain must run
+        // in order: a single encoder with a texture memory barrier between
+        // dispatches guarantees each frame's write is visible to the next.
         guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
             throw BlendError.commandEncodingFailed
         }
+        encoder.setComputePipelineState(accumulatePipeline)
 
-        // Seed lighten/darken with the first frame so max/min start from real data
-        // (a zero seed would leave darken pinned to black, since min(0, x) = 0).
-        // The lighten kernel writes the first frame verbatim (max(0, x) = x) and
-        // initialises the running mean; the rest of the frames then accumulate with
-        // the mode's own kernel. Average has no seed and the loop covers every frame.
-        let framesToAccumulate: ArraySlice<CVPixelBuffer>
         var dispatchedAny = false
-        if mode.seedsWithFirstFrame {
-            guard let seedTexture = makeReadTexture(from: first) else {
-                throw BlendError.textureAllocationFailed
-            }
-            let seedPipeline = try accumulatePipeline(for: .lighten)
-            encoder.setComputePipelineState(seedPipeline)
-            encoder.setTexture(seedTexture, index: 0)
-            encoder.setTexture(accumulator, index: 1)
-            if let mean { encoder.setTexture(mean, index: 2) }
-            dispatch(encoder, pipeline: seedPipeline, width: width, height: height)
-            dispatchedAny = true
-            framesToAccumulate = frames[1...]
-        } else {
-            framesToAccumulate = frames[0...]
-        }
-
-        encoder.setComputePipelineState(modePipeline)
-        for frame in framesToAccumulate {
+        for frame in frames {
             guard let frameTexture = makeReadTexture(from: frame) else {
                 throw BlendError.textureAllocationFailed
             }
@@ -217,15 +191,17 @@ final class BlendEngine {
                 encoder.memoryBarrier(scope: .textures)
             }
             encoder.setTexture(frameTexture, index: 0)
-            encoder.setTexture(accumulator, index: 1)
-            if let mean { encoder.setTexture(mean, index: 2) }
-            dispatch(encoder, pipeline: modePipeline, width: width, height: height)
+            encoder.setTexture(minTex, index: 1)
+            encoder.setTexture(maxTex, index: 2)
+            encoder.setTexture(sumTex, index: 3)
+            dispatch(encoder, pipeline: accumulatePipeline, width: width, height: height)
             dispatchedAny = true
         }
         encoder.endEncoding()
 
         let output = try makeOutputTexture(width: width, height: height)
-        try encodeResolve(accumulator: accumulator, mean: mean, output: output, mode: mode, on: commandBuffer)
+        try encodeResolve(minTex: minTex, maxTex: maxTex, sumTex: sumTex,
+                          output: output, bias: bias, on: commandBuffer)
 
         commandBuffer.commit()
         commandBuffer.waitUntilCompleted()
@@ -237,44 +213,20 @@ final class BlendEngine {
         return try cgImage(from: output)
     }
 
-    // MARK: - Seeding (lighten/darken)
-
-    private func seed(accumulator: MTLTexture, mean: MTLTexture?, with frame: CVPixelBuffer, on commandBuffer: MTLCommandBuffer) throws {
-        // The accumulator is zero-cleared and linear frame values are >= 0, so running the
-        // lighten (max) kernel once writes the first frame's linear values verbatim. Both
-        // lighten and darken use this to start max/min from real data rather than 0. It also
-        // seeds the running average (mean.rgb = first frame, mean.a = 1).
-        guard let frameTexture = makeReadTexture(from: frame) else {
-            throw BlendError.textureAllocationFailed
-        }
-        let pipeline = try accumulatePipeline(for: .lighten)
-        guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
-            throw BlendError.commandEncodingFailed
-        }
-        encoder.setComputePipelineState(pipeline)
-        encoder.setTexture(frameTexture, index: 0)
-        encoder.setTexture(accumulator, index: 1)
-        if let mean { encoder.setTexture(mean, index: 2) }
-        dispatch(encoder, pipeline: pipeline, width: accumulator.width, height: accumulator.height)
-        encoder.endEncoding()
-    }
-
     // MARK: - Resolve
 
-    private func encodeResolve(accumulator: MTLTexture, mean: MTLTexture?, output: MTLTexture, mode: BlendMode, on commandBuffer: MTLCommandBuffer) throws {
+    private func encodeResolve(minTex: MTLTexture, maxTex: MTLTexture, sumTex: MTLTexture,
+                               output: MTLTexture, bias: Float, on commandBuffer: MTLCommandBuffer) throws {
         guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
             throw BlendError.commandEncodingFailed
         }
         encoder.setComputePipelineState(resolvePipeline)
-        encoder.setTexture(accumulator, index: 0)
-        encoder.setTexture(output, index: 1)
-        // For average, `mean` is nil; the kernel ignores texture 2 in that branch, but a
-        // binding must still exist — reuse the accumulator as a harmless placeholder.
-        encoder.setTexture(mean ?? accumulator, index: 2)
-        var divide: UInt32 = mode.dividesByCount ? 1 : 0
-        encoder.setBytes(&divide, length: MemoryLayout<UInt32>.size, index: 0)
-        var strength = mode.strength
-        encoder.setBytes(&strength, length: MemoryLayout<Float>.size, index: 1)
+        encoder.setTexture(minTex, index: 0)
+        encoder.setTexture(maxTex, index: 1)
+        encoder.setTexture(sumTex, index: 2)
+        encoder.setTexture(output, index: 3)
+        var b = min(max(bias, -1), 1)
+        encoder.setBytes(&b, length: MemoryLayout<Float>.size, index: 0)
         dispatch(encoder, pipeline: resolvePipeline, width: output.width, height: output.height)
         encoder.endEncoding()
     }
@@ -293,7 +245,7 @@ final class BlendEngine {
 
     // MARK: - Texture allocation
 
-    private func makeAccumulator(width: Int, height: Int) throws -> MTLTexture {
+    private func makeAccumulator(width: Int, height: Int, fill: Float) throws -> MTLTexture {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .rgba32Float, width: width, height: height, mipmapped: false)
         descriptor.usage = [.shaderRead, .shaderWrite]
@@ -301,23 +253,28 @@ final class BlendEngine {
         guard let texture = device.makeTexture(descriptor: descriptor) else {
             throw BlendError.textureAllocationFailed
         }
-        // float32 .private textures are not guaranteed zero-initialized; clear via a render-free blit.
-        try clearToZero(texture)
+        // float32 .private textures are not guaranteed initialized; seed via a blit.
+        try fillTexture(texture, with: fill)
         return texture
     }
 
-    private func clearToZero(_ texture: MTLTexture) throws {
+    private func fillTexture(_ texture: MTLTexture, with value: Float) throws {
         guard let commandBuffer = commandQueue.makeCommandBuffer(),
               let blit = commandBuffer.makeBlitCommandEncoder() else {
             throw BlendError.commandEncodingFailed
         }
         let bytesPerRow = texture.width * MemoryLayout<Float>.size * 4
         let length = bytesPerRow * texture.height
-        guard let zeroBuffer = device.makeBuffer(length: length, options: .storageModeShared) else {
+        guard let seedBuffer = device.makeBuffer(length: length, options: .storageModeShared) else {
             throw BlendError.textureAllocationFailed
         }
-        memset(zeroBuffer.contents(), 0, length)
-        blit.copy(from: zeroBuffer, sourceOffset: 0,
+        if value == 0 {
+            memset(seedBuffer.contents(), 0, length)
+        } else {
+            let floats = seedBuffer.contents().bindMemory(to: Float.self, capacity: length / MemoryLayout<Float>.size)
+            for i in 0..<(length / MemoryLayout<Float>.size) { floats[i] = value }
+        }
+        blit.copy(from: seedBuffer, sourceOffset: 0,
                   sourceBytesPerRow: bytesPerRow, sourceBytesPerImage: length,
                   sourceSize: MTLSize(width: texture.width, height: texture.height, depth: 1),
                   to: texture, destinationSlice: 0, destinationLevel: 0,
@@ -355,9 +312,9 @@ final class BlendEngine {
 
     /// Renders one frame to a CGImage through the same pipeline as the blend, so its
     /// orientation matches a blended result. Used by the before/after compare view.
-    /// A one-frame average is just the frame itself.
+    /// A one-frame blend at bias 0 is just the frame itself.
     func render(frame: CVPixelBuffer) throws -> CGImage {
-        try blend(frames: [frame], mode: .average)
+        try blend(frames: [frame], bias: 0)
     }
 
     // MARK: - Readback

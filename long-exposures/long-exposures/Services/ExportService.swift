@@ -31,13 +31,13 @@ struct ExportService {
 
     /// Blends the selected range of full-res frames into one image.
     /// Bypasses the engine's range cache (which holds preview-res results).
-    func renderFullResolution(frames: [CVPixelBuffer], range: ClosedRange<Int>, mode: BlendMode,
+    func renderFullResolution(frames: [CVPixelBuffer], range: ClosedRange<Int>, bias: Float,
                               resolution: ExportResolution) throws -> CGImage {
         let lower = max(0, range.lowerBound)
         let upper = min(frames.count - 1, range.upperBound)
         guard lower <= upper else { throw BlendError.noFrames }
 
-        let cgImage = try engine.blend(frames: Array(frames[lower...upper]), mode: mode)
+        let cgImage = try engine.blend(frames: Array(frames[lower...upper]), bias: bias)
         guard let cap = resolution.longEdgeCap else { return cgImage }
         return downscale(cgImage, longEdgeCap: cap)
     }
