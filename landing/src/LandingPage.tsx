@@ -315,50 +315,6 @@ function BeforeAfterSlider({
  *  Swap `src` in PHOTOS[] when real exposures are dropped in.    *
  * ============================================================== */
 
-function FrameSlot({
-  src,
-  alt,
-  caption,
-  mode,
-  exposure,
-  className = "",
-  aspect = "4 / 5",
-}: {
-  src?: string;
-  alt: string;
-  caption: string;
-  mode: string;
-  exposure: string;
-  className?: string;
-  aspect?: string;
-}) {
-  return (
-    <figure className={`group relative overflow-hidden border border-line bg-panel-2 ${className}`} style={{ aspectRatio: aspect }}>
-      {src ? (
-        <img src={src} alt={alt} className="h-full w-full object-cover transition-transform duration-[1200ms] group-hover:scale-[1.03]" style={{ transitionTimingFunction: EASE }} loading="lazy" />
-      ) : (
-        /* placeholder — clearly a slot awaiting a real shot */
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-ink-3">
-          <div className="absolute inset-0 ticks opacity-30" />
-          <div className="pointer-events-none absolute inset-3 border border-dashed border-line-bright" />
-          <Glyph d="M4 8 L7 8 L8.5 5.5 L15.5 5.5 L17 8 L20 8 V18 H4 Z M12 12.5 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0" className="relative h-7 w-7" />
-          <Mono className="relative">Your exposure</Mono>
-          <span className="relative max-w-[14ch] text-center text-[11px] leading-snug text-ink-3">{alt}</span>
-        </div>
-      )}
-
-      {/* instrument readout strip */}
-      <figcaption className="absolute inset-x-0 bottom-0 flex items-center justify-between border-t border-line/80 bg-base/70 px-3 py-2 backdrop-blur-sm">
-        <span className="text-[12px] font-medium text-ink">{caption}</span>
-        <span className="flex items-center gap-2">
-          <Mono className="text-signal-soft">{mode}</Mono>
-          <Mono className="tabular-nums text-ink-3">{exposure}</Mono>
-        </span>
-      </figcaption>
-    </figure>
-  );
-}
-
 /* ========================= HERO RESULT ========================= *
  *  The hero visual: one finished long exposure, framed as the     *
  *  output of a clip. A top readout names the video source ("from  *
@@ -445,7 +401,6 @@ const MODES = [
 
 function ModeSwitch() {
   const [active, setActive] = useState(0);
-  const mode = MODES[active];
 
   return (
     <div className="overflow-hidden border border-line bg-panel">
