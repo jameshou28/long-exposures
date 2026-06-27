@@ -654,18 +654,41 @@ export function LandingPage() {
           </div>
 
           {/* capture callout — distinct treatment, not another card in the grid */}
-          <Rise className="mt-px grid items-stretch gap-px border border-t-0 border-line bg-line md:grid-cols-[1.4fr_1fr]">
-            <div className="flex flex-col justify-center gap-4 bg-panel p-7 sm:p-10">
-              <Mono className="text-ink-3">In-app capture</Mono>
-              <h3 className="font-display text-[clamp(1.75rem,4vw,2.75rem)] font-bold leading-tight text-ink">
-                Or shoot a fresh clip with the exposure locked.
-              </h3>
-              <p className="prose-pretty text-[15px] leading-relaxed text-ink-2">
-                Record inside the app with exposure and white balance pinned, so every frame
-                matches before they ever blend. The cleanest possible source — no flicker to fix.
-              </p>
+          <Rise className="mt-px border border-t-0 border-line bg-line">
+            <div className="grid gap-px lg:grid-cols-[1fr_minmax(0,0.8fr)]">
+              {/* left: copy */}
+              <div className="flex flex-col justify-center gap-4 bg-panel p-7 sm:p-10">
+                <Mono className="text-ink-3">In-app capture</Mono>
+                <h3 className="font-display text-[clamp(1.75rem,4vw,2.75rem)] font-bold leading-tight text-ink">
+                  Or shoot a fresh clip with the exposure locked.
+                </h3>
+                <p className="prose-pretty text-[15px] leading-relaxed text-ink-2">
+                  Record inside the app with exposure and white balance pinned, so every frame
+                  matches before they ever blend. The cleanest possible source — no flicker to fix.
+                </p>
+              </div>
+
+              {/* right: locked-capture spec readout */}
+              <div className="flex flex-col justify-center bg-panel p-7 sm:p-10">
+                <Mono className="mb-5 text-ink-3">What locked capture means</Mono>
+                <dl className="flex flex-col divide-y divide-line">
+                  {[
+                    { key: "Exposure", val: "Custom · locked at record", glyph: "M12 2 V6 M12 18 V22 M4.93 4.93 L7.76 7.76 M16.24 16.24 L19.07 19.07 M2 12 H6 M18 12 H22 M4.93 19.07 L7.76 16.24 M16.24 7.76 L19.07 4.93" },
+                    { key: "White balance", val: "Locked · no colour shift", glyph: "M12 3 a9 9 0 1 0 0 18 a9 9 0 1 0 0 -18 M12 3 C10 7 10 17 12 21 M12 3 C14 7 14 17 12 21 M3 12 H21" },
+                    { key: "Frame format", val: "BGRA · same as import", glyph: "M4 6 H20 V18 H4 Z M4 10 H20 M10 10 V18" },
+                    { key: "Flicker", val: "None · pipeline stays clean", glyph: "M5 12 L9 8 L13 14 L17 10 L19 12" },
+                  ].map(({ key, val, glyph }) => (
+                    <div key={key} className="flex items-center justify-between gap-4 py-3.5">
+                      <span className="flex items-center gap-3">
+                        <Glyph d={glyph} className="h-4 w-4 shrink-0 text-signal-soft" />
+                        <Mono className="text-ink-2">{key}</Mono>
+                      </span>
+                      <Mono className="text-right text-ink-3">{val}</Mono>
+                    </div>
+                  ))}
+                </dl>
+              </div>
             </div>
-            <FrameSlot alt="In-app camera capturing a locked-exposure clip at night" caption="Capture · locked" mode="LIVE" exposure="REC" aspect="auto" className="min-h-[16rem] border-0" />
           </Rise>
         </section>
 
