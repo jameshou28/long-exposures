@@ -74,7 +74,7 @@ struct ImportService {
     /// Most frames we keep from one clip. A Live Photo's paired video is well under
     /// this; long regular videos are sampled down so memory and the timeline stay
     /// bounded. Every kept frame is held full-res, so this is a real ceiling.
-    static let maxFrames = 120
+    static let maxFrames = 167
 
     /// Decodes a video URL to BGRA CVPixelBuffers, evenly sampling down to
     /// `maxFrames` for long clips. Faster than AVAssetImageGenerator for a sweep.
