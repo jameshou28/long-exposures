@@ -191,7 +191,6 @@ final class EditorViewModel {
             await refreshDisplayedImage()
         } catch {
             previewError = "Preview failed: \(error.localizedDescription)"
-            print("[long-exposures] preview blend failed: \(error)")
         }
     }
 
@@ -242,7 +241,6 @@ final class EditorViewModel {
             }
         } catch {
             exportMessage = "Export failed: \(error.localizedDescription)"
-            print("[long-exposures] export failed: \(error)")
         }
     }
 }

@@ -171,7 +171,6 @@ struct ContentView: View {
     }
 
     private func beginPick() async {
-        // Prime before the cold system prompt the first time; otherwise proceed.
         if PHPhotoLibrary.authorizationStatus(for: .readWrite) == .notDetermined {
             primingFor = .photos
             return
@@ -228,7 +227,6 @@ struct ContentView: View {
         } catch {
             statusMessage = "Failed: \(error.localizedDescription)"
             editorModel = nil
-            print("[long-exposures] capture ingest error: \(error)")
         }
     }
 
@@ -264,7 +262,6 @@ struct ContentView: View {
         } catch {
             statusMessage = "Failed: \(error.localizedDescription)"
             editorModel = nil
-            print("[long-exposures] error: \(error)")
         }
     }
 }

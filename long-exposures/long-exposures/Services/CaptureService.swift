@@ -17,7 +17,6 @@
 //  Threading: AVCaptureSession and its objects aren't Sendable and must be touched
 //  on one serial queue. `SessionController` confines all of that to `sessionQueue`;
 //  `CaptureService` is the @MainActor, @Observable face that drives the SwiftUI view.
-//
 
 import Foundation
 import AVFoundation
@@ -89,8 +88,6 @@ final class CaptureService {
     func stopSession() {
         controller.stopSession()
     }
-
-    // MARK: - Recording
 
     /// Locks exposure + white balance, then starts collecting frames.
     func startRecording() {
