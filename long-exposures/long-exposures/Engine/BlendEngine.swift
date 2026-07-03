@@ -2,22 +2,7 @@
 //  BlendEngine.swift
 //  long-exposures
 //
-//  The core blend engine. Reduces N frames into one long-exposure image,
-//  accumulating in linear light in float32 textures.
-//
-//  The blend is a continuous slider rather than discrete modes: a single pass
-//  accumulates the running min, max, and average of every frame at once, and a
-//  signed `bias` in [-1, +1] picks where to land — toward the min (darken) on
-//  the negative side, toward the max (lighten) on the positive side, plain
-//  average at 0.
-//
-//  Pipeline per blend:
-//    1. Allocate min/max/sum float32 accumulators at the frame size.
-//    2. Seed them (min -> large, max/sum -> zero).
-//    3. For each frame: upload BGRA -> Metal texture, run the accumulate kernel,
-//       with a memory barrier between frames so the read-modify-write chain runs
-//       in order (separate dispatches on a shared read_write texture otherwise race).
-//    4. Resolve to an sRGB BGRA8 texture with the chosen bias and read back a CGImage.
+//  The core blend engine
 //
 
 import Foundation
@@ -30,8 +15,6 @@ enum BlendMode: String, CaseIterable {
     case lighten
     case darken
 
-    /// Signed bias on the darken<->average<->lighten axis for this discrete mode.
-    /// The slider uses these as anchors; the value persists for saved exposures.
     var bias: Float {
         switch self {
         case .average: return 0
@@ -41,32 +24,15 @@ enum BlendMode: String, CaseIterable {
     }
 }
 
-/// Everything the engine needs to synthesize intermediate samples ("smooth
-/// motion") for one blend. Entry i of `flows` is the flow for the gap between
-/// frames i and i+1 of the frame array the blend receives; nil entries skip
-/// synthesis for that gap. Never carries pixel data for the synthesized frames
-/// themselves — they are warped straight into the accumulators on the GPU.
+/// Everything the engine needs to smooth motion for a blend.
 struct BlendInterpolation {
     let flows: [FlowField?]
-    /// Per-gap registration shake correction (transform[i+1] applied minus
-    /// transform[i] applied, expressed as the raw-flow component to subtract),
-    /// in pixels at the flow's measured resolution. Empty when alignment is off.
     let shakeDeltas: [SIMD2<Float>]
 
-    /// Hard cap on synthesized samples per gap, so a degenerate flow estimate
-    /// can't stall a blend. Bounds a full-res export at ~15 extra dispatches
-    /// per fast gap; at the cap a 240-output-px streak still closes to ~15 px
-    /// steps, which linear-filtered sampling blurs over.
+    ///Hard cap on synthesized samples per gap to prevent stalling
     static let maxSamplesPerGap = 15
-    /// Target spacing between temporal samples, in pixels *at the resolution
-    /// being blended* (flow magnitudes are rescaled by flowScale before the
-    /// division). Perceived gap size scales with output resolution — a step
-    /// that looks continuous in a 720 px preview is a visible stutter in a
-    /// 4032 px export — so the density must be computed in output pixels.
     static let targetStepPixels: Float = 8
 
-    /// Payload for a slice `range` of the frame array this payload was built
-    /// for: frames lower...upper have gaps lower..<upper.
     func sliced(to range: ClosedRange<Int>) -> BlendInterpolation {
         guard range.lowerBound < range.upperBound,
               range.lowerBound >= 0, range.upperBound <= flows.count else {
@@ -90,13 +56,13 @@ enum BlendError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .metalUnavailable:      return "No Metal device available."
-        case .libraryLoadFailed:     return "Could not load the Metal shader library."
+        case .metalUnavailable: return "No Metal device available."
+        case .libraryLoadFailed: return "Could not load the Metal shader library."
         case .kernelNotFound(let n): return "Compute kernel '\(n)' not found."
         case .textureAllocationFailed: return "Failed to allocate a Metal texture."
-        case .noFrames:              return "No frames to blend."
+        case .noFrames: return "No frames to blend."
         case .commandEncodingFailed: return "Failed to encode Metal commands."
-        case .imageReadbackFailed:   return "Failed to read the blended image back from the GPU."
+        case .imageReadbackFailed: return "Failed to read the blended image back from the GPU."
         }
     }
 }
@@ -113,20 +79,13 @@ final class BlendEngine {
     private var interpolatePipeline: MTLComputePipelineState!
     private var resolvePipeline: MTLComputePipelineState!
 
-    /// Mirrors `WarpParams` in BlendKernels.metal: float, float, float2 — the
-    /// float2's 8-byte alignment makes both layouts 16 bytes.
     private struct WarpParams {
         var t: Float
         var flowScale: Float
         var shakeDelta: SIMD2<Float>
     }
 
-    /// Seed value for the min accumulator: larger than any linear colour (which is
-    /// in [0,1] after sRGB->linear), so the first real value always wins the min.
     private static let minSeed: Float = 1e9
-
-    /// Caches rendered results so revisiting a range during a drag is instant.
-    /// Keyed by quantized bias + range + frame-set identity. Bounded; oldest drop.
     private struct CacheKey: Hashable {
         let biasBucket: Int
         let lowerBound: Int
@@ -137,11 +96,7 @@ final class BlendEngine {
     private var resultCache: [CacheKey: CGImage] = [:]
     private var cacheOrder: [CacheKey] = []
     private let cacheLimit = 64
-    /// Bumped whenever the frame set changes so stale cache entries can't collide.
     private var generation = 0
-
-    /// Bias is continuous; bucket it so near-identical slider positions share a
-    /// cache entry (and so float keys stay stable). 100 buckets over [-1, +1].
     private static func biasBucket(_ bias: Float) -> Int {
         Int((min(max(bias, -1), 1) * 50).rounded())
     }
@@ -172,19 +127,13 @@ final class BlendEngine {
         }
         return try device.makeComputePipelineState(function: function)
     }
-
-    /// Call when the underlying frame set changes (new import) so cached results
-    /// for the previous frames are never returned for the new ones.
     func invalidateCache() {
         generation += 1
         resultCache.removeAll(keepingCapacity: true)
         cacheOrder.removeAll(keepingCapacity: true)
     }
 
-    /// Blends a contiguous range of frames, caching the result per (bias, range).
-    /// Used by the interactive editor: dragging back to a prior range is instant.
-    /// `interpolation`, when present, must cover the *full* frame array — it is
-    /// sliced here alongside the frames.
+    /// blends a range of frames
     func blend(frames: [CVPixelBuffer], range: ClosedRange<Int>, bias: Float,
                interpolation: BlendInterpolation? = nil) throws -> CGImage {
         guard !frames.isEmpty else { throw BlendError.noFrames }
@@ -212,10 +161,7 @@ final class BlendEngine {
         }
     }
 
-    /// Blends the given BGRA frames into a single long-exposure CGImage at `bias`.
-    /// `interpolation`, when present, must be 1:1 with `frames`' gaps
-    /// (flows.count == frames.count - 1): each gap with a flow field gets
-    /// synthesized in-between samples warped into the accumulators.
+    /// blends the bgra frames into a long-exposure img
     func blend(frames: [CVPixelBuffer], bias: Float,
                interpolation: BlendInterpolation? = nil) throws -> CGImage {
         guard let first = frames.first else { throw BlendError.noFrames }
@@ -231,10 +177,6 @@ final class BlendEngine {
             throw BlendError.commandEncodingFailed
         }
 
-        // All frames accumulate into the same read_write textures, each dispatch
-        // reading what the prior one wrote. That read-modify-write chain must run
-        // in order: a single encoder with a texture memory barrier between
-        // dispatches guarantees each frame's write is visible to the next.
         guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
             throw BlendError.commandEncodingFailed
         }
@@ -255,9 +197,6 @@ final class BlendEngine {
             dispatch(encoder, pipeline: accumulatePipeline, width: width, height: height)
             dispatchedAny = true
 
-            // Fill the temporal gap to the next frame with synthesized samples,
-            // warped along the pair's optical flow straight into the same
-            // accumulators. A missing flow just leaves that gap unsynthesized.
             guard let interpolation, index < interpolation.flows.count,
                   index + 1 < frames.count,
                   let flow = interpolation.flows[index],
@@ -303,19 +242,12 @@ final class BlendEngine {
         return try cgImage(from: output)
     }
 
-    /// Synthesized samples for one gap: enough that consecutive temporal
-    /// samples land ~targetStepPixels apart along the fastest motion in the
-    /// gap, *measured at the resolution being blended* (flowScale converts the
-    /// flow-resolution magnitude), capped so a degenerate flow estimate can't
-    /// stall a blend, floored at 1 so every gap gets at least a midpoint.
     private static func sampleCount(for flow: FlowField, flowScale: Float) -> Int {
         guard flow.maxMagnitude.isFinite, flowScale.isFinite, flowScale > 0 else { return 1 }
         let magnitude = flow.maxMagnitude * flowScale
         let ideal = Int((magnitude / BlendInterpolation.targetStepPixels).rounded(.up)) - 1
         return min(BlendInterpolation.maxSamplesPerGap, max(1, ideal))
     }
-
-    // MARK: - Resolve
 
     private func encodeResolve(minTex: MTLTexture, maxTex: MTLTexture, sumTex: MTLTexture,
                                output: MTLTexture, bias: Float, on commandBuffer: MTLCommandBuffer) throws {
@@ -333,8 +265,6 @@ final class BlendEngine {
         encoder.endEncoding()
     }
 
-    // MARK: - Dispatch helper
-
     private func dispatch(_ encoder: MTLComputeCommandEncoder, pipeline: MTLComputePipelineState, width: Int, height: Int) {
         let w = pipeline.threadExecutionWidth
         let h = max(1, pipeline.maxTotalThreadsPerThreadgroup / w)
@@ -345,8 +275,6 @@ final class BlendEngine {
         encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threadsPerGroup)
     }
 
-    // MARK: - Texture allocation
-
     private func makeAccumulator(width: Int, height: Int, fill: Float) throws -> MTLTexture {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .rgba32Float, width: width, height: height, mipmapped: false)
@@ -355,7 +283,6 @@ final class BlendEngine {
         guard let texture = device.makeTexture(descriptor: descriptor) else {
             throw BlendError.textureAllocationFailed
         }
-        // float32 .private textures are not guaranteed initialized; seed via a blit.
         try fillTexture(texture, with: fill)
         return texture
     }
@@ -397,7 +324,6 @@ final class BlendEngine {
         return texture
     }
 
-    /// Wraps a BGRA CVPixelBuffer as a Metal texture without copying.
     private func makeReadTexture(from buffer: CVPixelBuffer) -> MTLTexture? {
         let width = CVPixelBufferGetWidth(buffer)
         let height = CVPixelBufferGetHeight(buffer)
@@ -412,8 +338,6 @@ final class BlendEngine {
         return texture
     }
 
-    /// Wraps a TwoComponent16Half flow buffer as an rg16Float Metal texture
-    /// without copying. Sibling of `makeReadTexture(from:)`.
     private func makeFlowTexture(from buffer: CVPixelBuffer) -> MTLTexture? {
         let width = CVPixelBufferGetWidth(buffer)
         let height = CVPixelBufferGetHeight(buffer)
@@ -428,19 +352,18 @@ final class BlendEngine {
         return texture
     }
 
-    /// Renders one frame to a CGImage through the same pipeline as the blend, so its
-    /// orientation matches a blended result. Used by the before/after compare view.
-    /// A one-frame blend at bias 0 is just the frame itself.
+
+
+    /// renders one frame for for the before state
     func render(frame: CVPixelBuffer) throws -> CGImage {
         try blend(frames: [frame], bias: 0)
     }
 
-    // MARK: - Readback
-
     private func cgImage(from texture: MTLTexture) throws -> CGImage {
         let ciImage = CIImage(mtlTexture: texture, options: [.colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
         guard let ciImage else { throw BlendError.imageReadbackFailed }
-        // Metal textures are top-left origin; CIImage is bottom-left. Flip vertically.
+
+
         let flipped = ciImage.transformed(by: CGAffineTransform(scaleX: 1, y: -1)
             .translatedBy(x: 0, y: -ciImage.extent.height))
         guard let cg = ciContext.createCGImage(flipped, from: flipped.extent) else {
