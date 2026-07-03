@@ -37,7 +37,7 @@ Long Exposures is an iOS app that turns your Live Photos and videos into real lo
 | **Select** | A scrollable thumbnail strip lets you drag two handles to pick exactly which frames enter the blend. |
 | **Align** | Vision estimates a per-frame translation and snaps the static background sharp, so handheld shake doesn't smear the scene you care about. |
 | **Match exposure** | Per-channel brightness gains correct the camera's auto-metering flicker between frames, so the blend comes out clean rather than banded. |
-| **Smooth motion** | Optical flow synthesizes in-between samples on the GPU, so fast subjects blur into a continuous streak instead of the discrete ghost copies a ~30 fps source leaves. |
+| **Smooth motion** | Optical flow synthesizes in-between samples on the GPU, so fast subjects blur into a continuous streak instead of the discrete ghost copies a ~30 fps source leaves. Sample density adapts to how fast things move *and* to the output resolution, so exports stay as smooth as the preview. If motion analysis isn't available for a clip, the app says so instead of silently doing nothing. |
 | **Blend** | A Metal GPU pipeline accumulates your frames in linear light and resolves them to sRGB. Three modes: **Average** for motion blur, **Lighten** for light trails, **Darken** for reflections and shadows. |
 | **Export** | Full-resolution render → JPEG, saved to the in-app library or straight to Photos. |
 
@@ -87,6 +87,7 @@ long-exposures/           ← Xcode project
     RegistrationService.swift  ← Vision frame alignment
     NormalizationService.swift ← Per-frame exposure matching
     OpticalFlowService.swift   ← Per-pair dense flow for motion smoothing
+    FlowSpike.swift       ← Temporary DEBUG harness (--flow-spike) for smooth motion
     ExportService.swift   ← Full-res render + save
     CaptureService.swift  ← In-app locked-exposure video capture
     LibraryStore.swift    ← On-device JPEG library + index
@@ -104,3 +105,21 @@ long-exposures/           ← Xcode project
     PermissionPriming.swift ← Pre-permission explanation sheets
 landing/                  ← Marketing site (React + Vite → Vercel)
 ```
+
+---
+
+## Development notes
+
+**The simulator can't exercise most of the pipeline.** It has no Live Photos and no
+camera, and Vision's optical-flow estimator (`VNGenerateOpticalFlowRequest`) can't run
+there at all — it fails with `Code=9 "Failed to create motion flow estimator"` on every
+frame pair, so **Smooth motion silently no-ops in the simulator** (the editor shows an
+orange "motion analysis isn't available" notice). Test blend, export, capture, and
+smooth motion on a real device.
+
+**Smooth-motion debug harness.** Launch the app (Debug build) with the `--flow-spike`
+argument and `FlowSpike.swift` synthesizes moving-square clips, runs the real flow +
+blend pipeline plus a hand-built ground-truth flow field, and writes PNGs and a report
+to the app container's `tmp/flowspike/`. On device, `moderate-mid.png` verifies
+Vision's flow direction convention: the square must sit halfway between its two frame
+positions. The harness is temporary — delete it once device verification is done.
