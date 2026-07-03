@@ -583,8 +583,9 @@ export function LandingPage() {
             <ModeSwitch />
           </Rise>
 
-          <div className="mt-px grid gap-px border border-t-0 border-line bg-line lg:grid-cols-2">
+          <div className="mt-px grid gap-px border border-t-0 border-line bg-line lg:grid-cols-3">
             {[
+              { name: "Smooth motion", icon: "M4 16 C8 16 8 8 12 8 C16 8 16 16 20 16 M4 12 C8 12 8 6 12 6 M12 18 C16 18 16 12 20 12", body: "Optical flow fills the gaps between frames, so fast subjects streak in one continuous trail instead of leaving discrete ghost copies." },
               { name: "Match exposure", icon: "M12 7 a5 5 0 1 0 0 10 a5 5 0 1 0 0 -10 M12 2 V4 M12 20 V22 M2 12 H4 M20 12 H22", body: "Evens out the brightness flicker the camera bakes in between frames, so the blend stays clean instead of pulsing." },
               { name: "Hold to compare", icon: "M12 4 V20 M4 6 H10 V18 H4 Z M14 6 H20 V18 H14 Z", body: "Press the preview to flip to a single sharp frame and see exactly what the exposure added." },
             ].map((f, i) => (
