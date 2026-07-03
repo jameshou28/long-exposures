@@ -1,14 +1,8 @@
 //
 //  FrameStore.swift
 //  long-exposures
-//
-//  Holds full-res CVPixelBuffers plus a downsampled preview-res copy of each.
-//  Preview frames drive interactive blending; full-res frames are used on export.
-//
-//  Alignment is computed per *selection*, not per clip. The reference frame is
-//  the centre of the current selection, so the part of the scene the user is
-//  actually blending stays sharp. Transforms are cached per reference index, so
-//  dragging the far handle (which leaves the centre put) doesn't recompute Vision.
+// 
+// store frames
 //
 
 import Foundation
@@ -21,37 +15,21 @@ import UIKit
 @MainActor
 final class FrameStore {
 
-    /// Raw imported frames, untouched. These are the source of truth.
+    /// raw imported frames
     private(set) var fullResolutionFrames: [CVPixelBuffer] = []
     private(set) var previewFrames: [CVPixelBuffer] = []
 
-    /// When true, the blend pulls registration-aligned frames for the selection.
     private(set) var isRegistered = false
-
-    /// When true, frames in the selection are exposure/white-balance matched.
     private(set) var isNormalized = false
-
-    /// When true, blends synthesize intermediate samples along optical flow
-    /// ("smooth motion") so low-fps sources streak instead of ghosting.
     private(set) var isInterpolated = false
 
-    /// Target long edge for preview-resolution frames, in pixels.
     static let previewLongEdge: CGFloat = 720
 
     @ObservationIgnored private let ciContext = CIContext()
     @ObservationIgnored private let registration = RegistrationService()
     @ObservationIgnored private let normalization = NormalizationService()
     @ObservationIgnored private let opticalFlow = OpticalFlowService()
-
-    /// Flow for every consecutive preview-frame pair, computed once per import
-    /// and kept for the clip's lifetime (registration/normalization toggles
-    /// can't invalidate it — see `flowFields()`).
     @ObservationIgnored private var flowCache: [FlowField?]?
-
-    /// Cache of per-frame transforms keyed by the reference frame they align to.
-    /// One entry holds the transform for every frame relative to that reference,
-    /// so revisiting a reference (e.g. the far handle moves but the centre doesn't)
-    /// reuses the Vision result.
     @ObservationIgnored private var transformCache: [Int: [FrameTransform]] = [:]
 
     func ingest(frames: [CVPixelBuffer]) {
@@ -86,16 +64,12 @@ final class FrameStore {
         isInterpolated = enabled
     }
 
-    // MARK: - Aligned frames for a selection
-
-    /// Returns the preview-res frames for `range`, aligned to the centre of `range`
-    /// when registration is on. Untouched slice otherwise.
+    /// returns the preview-res frames for range
     func previewFrames(for range: ClosedRange<Int>) async -> [CVPixelBuffer] {
         await frames(previewFrames, for: range)
     }
 
-    /// Returns the full-res frames for `range`, aligned to the centre of `range`
-    /// when registration is on. Used on export.
+    /// Returns the full-res frames for range (for export)
     func fullResolutionFrames(for range: ClosedRange<Int>) async -> [CVPixelBuffer] {
         await frames(fullResolutionFrames, for: range)
     }
@@ -107,7 +81,6 @@ final class FrameStore {
         var slice = Array(source[lower...upper])
         guard slice.count > 1, (isRegistered || isNormalized) else { return slice }
 
-        // Reference = centre of the selection. Pipeline order: register, then normalize.
         let absoluteReference = lower + RegistrationService.referenceIndex(frameCount: slice.count)
         let sliceReference = RegistrationService.referenceIndex(frameCount: slice.count)
 
@@ -122,14 +95,7 @@ final class FrameStore {
         return slice
     }
 
-    // MARK: - Interpolation (smooth motion)
-
-    /// Interpolation payload covering *all* frames (flows for every consecutive
-    /// pair), or nil when the feature is off or flow failed everywhere. Callers
-    /// that blend a slice of the frame array slice this payload to match
-    /// (`BlendInterpolation.sliced(to:)`); the engine's cached range variant
-    /// slices internally. `range` only picks the registration reference so the
-    /// shake deltas match the transforms the aligned frames themselves used.
+    /// smooth motion
     func interpolation(for range: ClosedRange<Int>) async -> BlendInterpolation? {
         guard isInterpolated, previewFrames.count > 1 else { return nil }
         let flows = await flowFields()
@@ -147,12 +113,6 @@ final class FrameStore {
         return BlendInterpolation(flows: flows, shakeDeltas: shakeDeltas)
     }
 
-    /// Flow for every consecutive preview-frame pair, computed once per import
-    /// and cached. Measured on the *raw* preview frames: registration only
-    /// translates frames, and that known translation is subtracted in the warp
-    /// kernel (shake delta) instead of rerunning Vision per selection
-    /// reference. Normalization is a pure gain and doesn't move pixels, so it
-    /// can't invalidate flow either.
     private func flowFields() async -> [FlowField?] {
         if let flowCache { return flowCache }
         let computed = await opticalFlow.flowsOffActor(for: previewFrames, using: ciContext)
@@ -160,13 +120,8 @@ final class FrameStore {
         return computed
     }
 
-    /// Per-gap translation delta between consecutive frames' registration
-    /// transforms, rescaled to each flow's measured resolution. Static content
-    /// aligned by shift t sits at (x_ref - t) in the raw frame, so the shake
-    /// component baked into raw flow i -> i+1 is t[i] - t[i+1]; the kernel
-    /// subtracts it so flow measured on raw frames applies to aligned ones.
-    /// Registration translations are Core Image coordinates (y-up) while flow
-    /// buffers are top-left origin (y-down), so the vertical component flips.
+
+
     private static func shakeDeltas(from transforms: [FrameTransform],
                                     matching flows: [FlowField?]) -> [SIMD2<Float>] {
         guard transforms.count > 1, transforms.count == flows.count + 1 else { return [] }
@@ -185,9 +140,6 @@ final class FrameStore {
         }
     }
 
-    /// Per-frame transforms aligning every frame to `reference`, cached.
-    /// Estimated on the preview frames (fast); the normalized transforms apply
-    /// at full resolution too.
     private func transforms(reference: Int) async -> [FrameTransform] {
         if let cached = transformCache[reference] { return cached }
         let computed = await registration.transformsOffActor(for: previewFrames, reference: reference)
@@ -195,9 +147,6 @@ final class FrameStore {
         return computed
     }
 
-    /// Small UIImages of each preview frame for the timeline strip.
-    /// Thumbnails always show the raw frames — the strip is a scrubber, not a
-    /// preview of the aligned blend.
     func makeThumbnails(longEdge: CGFloat = 96) -> [UIImage] {
         previewFrames.map { buffer in
             let width = CVPixelBufferGetWidth(buffer)

@@ -2,9 +2,7 @@
 //  AppSettings.swift
 //  long-exposures
 //
-//  User defaults for the editor — the blend mode and export resolution
-//  a new edit starts with. Persisted in UserDefaults; read once when an editor is
-//  created so a fresh import lands on the user's preferred settings.
+//  user defaults for the editor
 //
 
 import Foundation
@@ -29,7 +27,7 @@ final class AppSettings {
         didSet { defaults.set(defaultResolution.rawValue, forKey: Key.defaultResolution) }
     }
 
-    /// False until the user finishes (or skips) the first-launch intro.
+    /// false until the user finishes (or skips) the first-launch intro.
     var hasSeenOnboarding: Bool {
         didSet { defaults.set(hasSeenOnboarding, forKey: Key.hasSeenOnboarding) }
     }
@@ -45,7 +43,7 @@ final class AppSettings {
 }
 
 extension BlendMode {
-    /// Title-case name for display in pickers and lists.
+    /// title-case name for display in pickers and lists.
     var displayName: String {
         rawValue.prefix(1).uppercased() + rawValue.dropFirst()
     }
