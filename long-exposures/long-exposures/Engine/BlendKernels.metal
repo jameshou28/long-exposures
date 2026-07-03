@@ -73,6 +73,69 @@ kernel void accumulate(texture2d<float, access::read>        frame  [[texture(0)
     sumTex.write(s, gid);
 }
 
+// --- Interpolated accumulation ---------------------------------------------
+//
+// Live Photo video is only ~15-30 fps, so averaging the captured frames leaves
+// fast subjects as discrete ghost copies (stroboscopic gaps in the streak).
+// This kernel fills one gap: it synthesizes the frame at time t in (0,1)
+// between two captured frames by backward-gather warping both endpoints along
+// the pair's dense optical flow, cross-fading by t, and accumulating the
+// result exactly as `accumulate` does. Synthesized frames are never
+// materialized — they exist only as this dispatch.
+//
+// Gather (sample at gid - t*flow) is used instead of scatter/splat because
+// scatter races between threads; sampling the flow at gid rather than at the
+// true source point is a first-order approximation whose error washes out in
+// an averaging blend. Cross-fading both endpoints covers occlusions cheaply —
+// the residual smear also averages away.
+//
+// Flow convention (see OpticalFlowService; verify with
+// BlendEngine.renderIntermediate): flow is measured from frame A to frame B on
+// B's pixel grid, in pixels at the resolution it was measured at
+// (WarpParams.flowScale rescales to this frame's pixels). Content at pixel x
+// in B originated at x - flow in A, so the intermediate at time t reads
+// A at (x - t*flow) and B at (x + (1-t)*flow).
+
+struct WarpParams {
+    float  t;          // sample time in (0,1) between frame A and frame B
+    float  flowScale;  // frame width / flow measuredWidth: flow px -> frame px
+    float2 shakeDelta; // registration translation delta A->B, in pixels at the
+                       // flow's measured resolution (zero when alignment is off)
+};
+
+kernel void accumulateInterpolated(
+    texture2d<float, access::sample>      frameA  [[texture(0)]],
+    texture2d<float, access::sample>      frameB  [[texture(1)]],
+    texture2d<float, access::sample>      flowTex [[texture(2)]],
+    texture2d<float, access::read_write>  minTex  [[texture(3)]],
+    texture2d<float, access::read_write>  maxTex  [[texture(4)]],
+    texture2d<float, access::read_write>  sumTex  [[texture(5)]],
+    constant WarpParams& p                        [[buffer(0)]],
+    uint2 gid [[thread_position_in_grid]])
+{
+    if (gid.x >= sumTex.get_width() || gid.y >= sumTex.get_height()) { return; }
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+
+    float2 size = float2(sumTex.get_width(), sumTex.get_height());
+    float2 uv   = (float2(gid) + 0.5f) / size;
+
+    // Flow in this frame's pixels. Registration already removed the global
+    // camera translation from the frames, so remove it from the flow too.
+    float2 f   = (flowTex.sample(s, uv).xy - p.shakeDelta) * p.flowScale;
+    float2 fuv = f / size;
+
+    float3 a = srgb_to_linear3(frameA.sample(s, uv - p.t * fuv).rgb);
+    float3 b = srgb_to_linear3(frameB.sample(s, uv + (1.0f - p.t) * fuv).rgb);
+    float3 lin = mix(a, b, p.t);
+
+    // Identical accumulation to `accumulate`: synthesized samples are
+    // uniformly spaced in time, so uniform weight keeps the sum a true
+    // temporal mean, and min/max (darken/lighten) see the streak too.
+    float4 mn = minTex.read(gid); mn.rgb = min(mn.rgb, lin); minTex.write(mn, gid);
+    float4 mx = maxTex.read(gid); mx.rgb = max(mx.rgb, lin); maxTex.write(mx, gid);
+    float4 sm = sumTex.read(gid); sm.rgb += lin; sm.a += 1.0f; sumTex.write(sm, gid);
+}
+
 // --- Resolve --------------------------------------------------------------
 //
 // Converts the accumulated linear data to an sRGB BGRA8 output texture.

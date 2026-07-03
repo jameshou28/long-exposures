@@ -41,6 +41,44 @@ enum BlendMode: String, CaseIterable {
     }
 }
 
+/// Everything the engine needs to synthesize intermediate samples ("smooth
+/// motion") for one blend. Entry i of `flows` is the flow for the gap between
+/// frames i and i+1 of the frame array the blend receives; nil entries skip
+/// synthesis for that gap. Never carries pixel data for the synthesized frames
+/// themselves — they are warped straight into the accumulators on the GPU.
+struct BlendInterpolation {
+    let flows: [FlowField?]
+    /// Per-gap registration shake correction (transform[i+1] applied minus
+    /// transform[i] applied, expressed as the raw-flow component to subtract),
+    /// in pixels at the flow's measured resolution. Empty when alignment is off.
+    let shakeDeltas: [SIMD2<Float>]
+
+    /// Hard cap on synthesized samples per gap, so a degenerate flow estimate
+    /// can't stall a blend. Bounds a full-res export at ~15 extra dispatches
+    /// per fast gap; at the cap a 240-output-px streak still closes to ~15 px
+    /// steps, which linear-filtered sampling blurs over.
+    static let maxSamplesPerGap = 15
+    /// Target spacing between temporal samples, in pixels *at the resolution
+    /// being blended* (flow magnitudes are rescaled by flowScale before the
+    /// division). Perceived gap size scales with output resolution — a step
+    /// that looks continuous in a 720 px preview is a visible stutter in a
+    /// 4032 px export — so the density must be computed in output pixels.
+    static let targetStepPixels: Float = 8
+
+    /// Payload for a slice `range` of the frame array this payload was built
+    /// for: frames lower...upper have gaps lower..<upper.
+    func sliced(to range: ClosedRange<Int>) -> BlendInterpolation {
+        guard range.lowerBound < range.upperBound,
+              range.lowerBound >= 0, range.upperBound <= flows.count else {
+            return BlendInterpolation(flows: [], shakeDeltas: [])
+        }
+        let gaps = range.lowerBound..<range.upperBound
+        return BlendInterpolation(
+            flows: Array(flows[gaps]),
+            shakeDeltas: shakeDeltas.isEmpty ? [] : Array(shakeDeltas[gaps]))
+    }
+}
+
 enum BlendError: LocalizedError {
     case metalUnavailable
     case libraryLoadFailed
@@ -72,7 +110,16 @@ final class BlendEngine {
     private let ciContext: CIContext
 
     private var accumulatePipeline: MTLComputePipelineState!
+    private var interpolatePipeline: MTLComputePipelineState!
     private var resolvePipeline: MTLComputePipelineState!
+
+    /// Mirrors `WarpParams` in BlendKernels.metal: float, float, float2 — the
+    /// float2's 8-byte alignment makes both layouts 16 bytes.
+    private struct WarpParams {
+        var t: Float
+        var flowScale: Float
+        var shakeDelta: SIMD2<Float>
+    }
 
     /// Seed value for the min accumulator: larger than any linear colour (which is
     /// in [0,1] after sRGB->linear), so the first real value always wins the min.
@@ -84,6 +131,7 @@ final class BlendEngine {
         let biasBucket: Int
         let lowerBound: Int
         let upperBound: Int
+        let interpolated: Bool
         let generation: Int
     }
     private var resultCache: [CacheKey: CGImage] = [:]
@@ -114,6 +162,7 @@ final class BlendEngine {
         self.ciContext = CIContext(mtlDevice: device)
 
         self.accumulatePipeline = try makePipeline(named: "accumulate")
+        self.interpolatePipeline = try makePipeline(named: "accumulateInterpolated")
         self.resolvePipeline = try makePipeline(named: "resolve")
     }
 
@@ -134,17 +183,22 @@ final class BlendEngine {
 
     /// Blends a contiguous range of frames, caching the result per (bias, range).
     /// Used by the interactive editor: dragging back to a prior range is instant.
-    func blend(frames: [CVPixelBuffer], range: ClosedRange<Int>, bias: Float) throws -> CGImage {
+    /// `interpolation`, when present, must cover the *full* frame array — it is
+    /// sliced here alongside the frames.
+    func blend(frames: [CVPixelBuffer], range: ClosedRange<Int>, bias: Float,
+               interpolation: BlendInterpolation? = nil) throws -> CGImage {
         guard !frames.isEmpty else { throw BlendError.noFrames }
         let lower = max(0, range.lowerBound)
         let upper = min(frames.count - 1, range.upperBound)
         guard lower <= upper else { throw BlendError.noFrames }
 
+        let sliced = interpolation?.sliced(to: lower...upper)
         let key = CacheKey(biasBucket: Self.biasBucket(bias),
-                           lowerBound: lower, upperBound: upper, generation: generation)
+                           lowerBound: lower, upperBound: upper,
+                           interpolated: sliced != nil, generation: generation)
         if let cached = resultCache[key] { return cached }
 
-        let image = try blend(frames: Array(frames[lower...upper]), bias: bias)
+        let image = try blend(frames: Array(frames[lower...upper]), bias: bias, interpolation: sliced)
         store(image, for: key)
         return image
     }
@@ -159,7 +213,11 @@ final class BlendEngine {
     }
 
     /// Blends the given BGRA frames into a single long-exposure CGImage at `bias`.
-    func blend(frames: [CVPixelBuffer], bias: Float) throws -> CGImage {
+    /// `interpolation`, when present, must be 1:1 with `frames`' gaps
+    /// (flows.count == frames.count - 1): each gap with a flow field gets
+    /// synthesized in-between samples warped into the accumulators.
+    func blend(frames: [CVPixelBuffer], bias: Float,
+               interpolation: BlendInterpolation? = nil) throws -> CGImage {
         guard let first = frames.first else { throw BlendError.noFrames }
 
         let width = CVPixelBufferGetWidth(first)
@@ -180,22 +238,54 @@ final class BlendEngine {
         guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
             throw BlendError.commandEncodingFailed
         }
-        encoder.setComputePipelineState(accumulatePipeline)
 
         var dispatchedAny = false
-        for frame in frames {
+        for (index, frame) in frames.enumerated() {
             guard let frameTexture = makeReadTexture(from: frame) else {
                 throw BlendError.textureAllocationFailed
             }
             if dispatchedAny {
                 encoder.memoryBarrier(scope: .textures)
             }
+            encoder.setComputePipelineState(accumulatePipeline)
             encoder.setTexture(frameTexture, index: 0)
             encoder.setTexture(minTex, index: 1)
             encoder.setTexture(maxTex, index: 2)
             encoder.setTexture(sumTex, index: 3)
             dispatch(encoder, pipeline: accumulatePipeline, width: width, height: height)
             dispatchedAny = true
+
+            // Fill the temporal gap to the next frame with synthesized samples,
+            // warped along the pair's optical flow straight into the same
+            // accumulators. A missing flow just leaves that gap unsynthesized.
+            guard let interpolation, index < interpolation.flows.count,
+                  index + 1 < frames.count,
+                  let flow = interpolation.flows[index],
+                  let flowTexture = makeFlowTexture(from: flow.buffer),
+                  let nextTexture = makeReadTexture(from: frames[index + 1])
+            else { continue }
+
+            let flowScale = Float(width) / Float(flow.measuredWidth)
+            let samples = Self.sampleCount(for: flow, flowScale: flowScale)
+            let shakeDelta = index < interpolation.shakeDeltas.count
+                ? interpolation.shakeDeltas[index] : SIMD2<Float>.zero
+
+            encoder.setComputePipelineState(interpolatePipeline)
+            encoder.setTexture(frameTexture, index: 0)
+            encoder.setTexture(nextTexture, index: 1)
+            encoder.setTexture(flowTexture, index: 2)
+            encoder.setTexture(minTex, index: 3)
+            encoder.setTexture(maxTex, index: 4)
+            encoder.setTexture(sumTex, index: 5)
+            for k in 1...samples {
+                encoder.memoryBarrier(scope: .textures)
+                var params = WarpParams(
+                    t: Float(k) / Float(samples + 1),
+                    flowScale: flowScale,
+                    shakeDelta: shakeDelta)
+                encoder.setBytes(&params, length: MemoryLayout<WarpParams>.stride, index: 0)
+                dispatch(encoder, pipeline: interpolatePipeline, width: width, height: height)
+            }
         }
         encoder.endEncoding()
 
@@ -211,6 +301,18 @@ final class BlendEngine {
         }
 
         return try cgImage(from: output)
+    }
+
+    /// Synthesized samples for one gap: enough that consecutive temporal
+    /// samples land ~targetStepPixels apart along the fastest motion in the
+    /// gap, *measured at the resolution being blended* (flowScale converts the
+    /// flow-resolution magnitude), capped so a degenerate flow estimate can't
+    /// stall a blend, floored at 1 so every gap gets at least a midpoint.
+    private static func sampleCount(for flow: FlowField, flowScale: Float) -> Int {
+        guard flow.maxMagnitude.isFinite, flowScale.isFinite, flowScale > 0 else { return 1 }
+        let magnitude = flow.maxMagnitude * flowScale
+        let ideal = Int((magnitude / BlendInterpolation.targetStepPixels).rounded(.up)) - 1
+        return min(BlendInterpolation.maxSamplesPerGap, max(1, ideal))
     }
 
     // MARK: - Resolve
@@ -310,12 +412,79 @@ final class BlendEngine {
         return texture
     }
 
+    /// Wraps a TwoComponent16Half flow buffer as an rg16Float Metal texture
+    /// without copying. Sibling of `makeReadTexture(from:)`.
+    private func makeFlowTexture(from buffer: CVPixelBuffer) -> MTLTexture? {
+        let width = CVPixelBufferGetWidth(buffer)
+        let height = CVPixelBufferGetHeight(buffer)
+        var cvTexture: CVMetalTexture?
+        let status = CVMetalTextureCacheCreateTextureFromImage(
+            kCFAllocatorDefault, textureCache, buffer, nil,
+            .rg16Float, width, height, 0, &cvTexture)
+        guard status == kCVReturnSuccess, let cvTexture,
+              let texture = CVMetalTextureGetTexture(cvTexture) else {
+            return nil
+        }
+        return texture
+    }
+
     /// Renders one frame to a CGImage through the same pipeline as the blend, so its
     /// orientation matches a blended result. Used by the before/after compare view.
     /// A one-frame blend at bias 0 is just the frame itself.
     func render(frame: CVPixelBuffer) throws -> CGImage {
         try blend(frames: [frame], bias: 0)
     }
+
+#if DEBUG
+    /// Spike helper for verifying Vision's flow direction convention by eye:
+    /// renders the single synthesized frame at `t` between `a` and `b` (dump it
+    /// via FrameDebugWriter and inspect). Correct convention puts a moving
+    /// subject `t` of the way from its position in `a` toward its position in
+    /// `b`; doubled means the flow is near-zero garbage, moved the wrong way
+    /// means the warp signs (or the handler/target order in
+    /// OpticalFlowService.flow) are flipped. Call it e.g. after import on two
+    /// preview frames of a panning clip.
+    func renderIntermediate(between a: CVPixelBuffer, and b: CVPixelBuffer,
+                            flow: FlowField, t: Float) throws -> CGImage {
+        let width = CVPixelBufferGetWidth(a)
+        let height = CVPixelBufferGetHeight(a)
+
+        let minTex = try makeAccumulator(width: width, height: height, fill: Self.minSeed)
+        let maxTex = try makeAccumulator(width: width, height: height, fill: 0)
+        let sumTex = try makeAccumulator(width: width, height: height, fill: 0)
+
+        guard let commandBuffer = commandQueue.makeCommandBuffer(),
+              let encoder = commandBuffer.makeComputeCommandEncoder() else {
+            throw BlendError.commandEncodingFailed
+        }
+        guard let aTexture = makeReadTexture(from: a),
+              let bTexture = makeReadTexture(from: b),
+              let flowTexture = makeFlowTexture(from: flow.buffer) else {
+            throw BlendError.textureAllocationFailed
+        }
+        encoder.setComputePipelineState(interpolatePipeline)
+        encoder.setTexture(aTexture, index: 0)
+        encoder.setTexture(bTexture, index: 1)
+        encoder.setTexture(flowTexture, index: 2)
+        encoder.setTexture(minTex, index: 3)
+        encoder.setTexture(maxTex, index: 4)
+        encoder.setTexture(sumTex, index: 5)
+        var params = WarpParams(t: t,
+                                flowScale: Float(width) / Float(flow.measuredWidth),
+                                shakeDelta: .zero)
+        encoder.setBytes(&params, length: MemoryLayout<WarpParams>.stride, index: 0)
+        dispatch(encoder, pipeline: interpolatePipeline, width: width, height: height)
+        encoder.endEncoding()
+
+        let output = try makeOutputTexture(width: width, height: height)
+        try encodeResolve(minTex: minTex, maxTex: maxTex, sumTex: sumTex,
+                          output: output, bias: 0, on: commandBuffer)
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        if commandBuffer.error != nil { throw BlendError.commandEncodingFailed }
+        return try cgImage(from: output)
+    }
+#endif
 
     // MARK: - Readback
 

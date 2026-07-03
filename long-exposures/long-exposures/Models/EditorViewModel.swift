@@ -68,6 +68,27 @@ final class EditorViewModel {
         }
     }
 
+    /// Synthesizes intermediate samples along optical flow so fast subjects
+    /// blur into a continuous streak instead of discrete ghost copies (Live
+    /// Photo video is only ~15–30 fps).
+    var interpolationEnabled = false {
+        didSet {
+            guard interpolationEnabled != oldValue else { return }
+            frameStore.setInterpolation(enabled: interpolationEnabled)
+            if !interpolationEnabled { flowUnavailable = false }
+            engine.invalidateCache()
+            scheduleBlend()
+        }
+    }
+    /// True while the per-pair flow fields are being computed — the first
+    /// blend after enabling runs N-1 Vision requests; later blends reuse them.
+    var isComputingFlow = false
+    /// True when smooth motion is on but flow estimation produced nothing —
+    /// Vision failed on every frame pair (it can't run in the simulator at
+    /// all), so the blend is silently identical to the toggle being off.
+    /// Surfaced in the UI so a total failure isn't mistaken for a weak effect.
+    var flowUnavailable = false
+
     /// True while either registration or normalization is reprocessing the selection.
     private var processesFramesPerSelection: Bool { registrationEnabled || normalizationEnabled }
 
@@ -133,6 +154,18 @@ final class EditorViewModel {
         }
 
         do {
+            // Synthesized in-betweens (smooth motion). The payload covers every
+            // frame pair; the engine's range variant slices it, and the aligned
+            // path slices it here to match its sliced frame array.
+            var interpolation: BlendInterpolation?
+            if interpolationEnabled {
+                isComputingFlow = true
+                interpolation = await frameStore.interpolation(for: start...end)
+                isComputingFlow = false
+                guard !Task.isCancelled else { return }
+                flowUnavailable = interpolation == nil
+            }
+
             let cgImage: CGImage
             // Compare shows the selection's centre frame — the natural sharp reference.
             let compareSliceIndex = RegistrationService.referenceIndex(frameCount: end - start + 1)
@@ -140,13 +173,15 @@ final class EditorViewModel {
             if processesFramesPerSelection {
                 let frames = await frameStore.previewFrames(for: start...end)
                 guard !Task.isCancelled, !frames.isEmpty else { return }
-                cgImage = try engine.blend(frames: frames, bias: bias)
+                cgImage = try engine.blend(frames: frames, bias: bias,
+                                           interpolation: interpolation?.sliced(to: start...end))
                 let cmp = min(compareSliceIndex, frames.count - 1)
                 compareImage = UIImage(cgImage: try engine.render(frame: frames[cmp]))
             } else {
                 let frames = frameStore.previewFrames
                 guard !frames.isEmpty else { return }
-                cgImage = try engine.blend(frames: frames, range: start...end, bias: bias)
+                cgImage = try engine.blend(frames: frames, range: start...end, bias: bias,
+                                           interpolation: interpolation)
                 let absolute = min(start + compareSliceIndex, frames.count - 1)
                 compareImage = UIImage(cgImage: try engine.render(frame: frames[absolute]))
             }
@@ -188,9 +223,16 @@ final class EditorViewModel {
             // is on. Already sliced to the range, so blend the whole array.
             let frames = await frameStore.fullResolutionFrames(for: start...end)
             guard !frames.isEmpty else { return }
+            // Full res reuses the low-res flow fields — the warp kernel rescales
+            // them by measuredWidth, the same way registration rescales its
+            // translations. Sliced to match the sliced frame array.
+            let interpolation = interpolationEnabled
+                ? await frameStore.interpolation(for: start...end)?.sliced(to: start...end)
+                : nil
             let service = ExportService(engine: engine)
             let cgImage = try service.renderFullResolution(
-                frames: frames, range: 0...(frames.count - 1), bias: bias, resolution: exportResolution)
+                frames: frames, range: 0...(frames.count - 1), bias: bias,
+                resolution: exportResolution, interpolation: interpolation)
             try library.add(image: cgImage, modeLabel: label, frameCount: frameCount)
             if saveToPhotos {
                 try await ExportService.saveToPhotos(cgImage)

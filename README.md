@@ -37,6 +37,7 @@ Long Exposures is an iOS app that turns your Live Photos and videos into real lo
 | **Select** | A scrollable thumbnail strip lets you drag two handles to pick exactly which frames enter the blend. |
 | **Align** | Vision estimates a per-frame translation and snaps the static background sharp, so handheld shake doesn't smear the scene you care about. |
 | **Match exposure** | Per-channel brightness gains correct the camera's auto-metering flicker between frames, so the blend comes out clean rather than banded. |
+| **Smooth motion** | Optical flow synthesizes in-between samples on the GPU, so fast subjects blur into a continuous streak instead of the discrete ghost copies a ~30 fps source leaves. |
 | **Blend** | A Metal GPU pipeline accumulates your frames in linear light and resolves them to sRGB. Three modes: **Average** for motion blur, **Lighten** for light trails, **Darken** for reflections and shadows. |
 | **Export** | Full-resolution render → JPEG, saved to the in-app library or straight to Photos. |
 
@@ -50,6 +51,7 @@ Long Exposures is an iOS app that turns your Live Photos and videos into real lo
 - **Three blend modes** — Average · Lighten · Darken
 - **Frame alignment** — keeps the background sharp on handheld shots
 - **Exposure matching** — kills brightness flicker between frames
+- **Motion smoothing** — optical-flow in-betweens turn ghosted streaks continuous
 - **Before / After** — hold the preview to compare against the original frame
 - **In-app library** — browse, share, or save past exposures
 - **No account. No upload. No network.** All processing happens on your device.
@@ -64,6 +66,7 @@ Long Exposures is an iOS app that turns your Live Photos and videos into real lo
 | GPU blend | Metal compute shaders |
 | Frame decode | AVFoundation (`AVAssetReader`) |
 | Registration | Vision (`VNTranslationalImageRegistrationRequest`) |
+| Motion smoothing | Vision (`VNGenerateOpticalFlowRequest`) + Metal warp kernel |
 | Color ops | Core Image |
 | Photo access | PhotoKit |
 | Capture | AVCaptureSession |
@@ -83,6 +86,7 @@ long-exposures/           ← Xcode project
     ImportService.swift   ← PHAsset / video → CVPixelBuffer frames
     RegistrationService.swift  ← Vision frame alignment
     NormalizationService.swift ← Per-frame exposure matching
+    OpticalFlowService.swift   ← Per-pair dense flow for motion smoothing
     ExportService.swift   ← Full-res render + save
     CaptureService.swift  ← In-app locked-exposure video capture
     LibraryStore.swift    ← On-device JPEG library + index

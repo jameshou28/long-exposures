@@ -81,7 +81,7 @@ struct EditorView: View {
                 ProgressView()
                     .tint(.white)
             }
-            if model.isBlending {
+            if model.isBlending || model.isComputingFlow {
                 ProgressView()
                     .tint(.white)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
@@ -120,16 +120,25 @@ struct EditorView: View {
                 caption: "even out brightness",
                 isOn: $model.normalizationEnabled
             )
+            toggleRow(
+                title: "Smooth motion",
+                caption: model.flowUnavailable
+                    ? "motion analysis isn't available for this clip — nothing was smoothed"
+                    : "fill gaps between frames so fast motion streaks instead of ghosting",
+                isOn: $model.interpolationEnabled,
+                isWarning: model.flowUnavailable
+            )
         }
     }
 
-    private func toggleRow(title: String, caption: String, isOn: Binding<Bool>) -> some View {
+    private func toggleRow(title: String, caption: String, isOn: Binding<Bool>,
+                           isWarning: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Toggle(isOn: isOn) { Text(title) }
                 .disabled(model.isRegistering)
             Text(caption)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isWarning ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
         }
     }
 

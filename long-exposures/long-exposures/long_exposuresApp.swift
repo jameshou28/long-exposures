@@ -12,6 +12,9 @@ struct long_exposuresApp: App {
     init() {
         // Reclaim temp video files left behind by imports in earlier runs.
         ImportService.purgeTempVideos()
+#if DEBUG
+        FlowSpike.runIfRequested()
+#endif
     }
 
     var body: some Scene {
