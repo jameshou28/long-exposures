@@ -24,6 +24,7 @@ import Foundation
 import Metal
 import CoreVideo
 import CoreImage
+import os.log
 
 enum BlendMode: String, CaseIterable {
     case average
@@ -267,6 +268,10 @@ final class BlendEngine {
 
             let flowScale = Float(width) / Float(flow.measuredWidth)
             let samples = Self.sampleCount(for: flow, flowScale: flowScale)
+            #if DEBUG
+            os_log(.debug, "warp gap %d: maxMag %.1fpx @%dpx -> %.1fpx effective, %d samples",
+                   index, flow.maxMagnitude, width, flow.maxMagnitude * flowScale, samples)
+            #endif
             let shakeDelta = index < interpolation.shakeDeltas.count
                 ? interpolation.shakeDeltas[index] : SIMD2<Float>.zero
 

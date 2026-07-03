@@ -27,6 +27,7 @@ import Foundation
 import Vision
 import CoreImage
 import CoreVideo
+import os.log
 
 /// Dense optical flow for one consecutive frame pair, measured at a reduced
 /// resolution. Vectors are in pixels at `measuredWidth`, so they can be
@@ -54,7 +55,15 @@ nonisolated struct OpticalFlowService: Sendable {
         guard frames.count > 1 else { return [] }
         // Downsample each frame once, not once per pair.
         let small = frames.map { downsample($0, using: context) }
-        return (0..<(frames.count - 1)).map { flow(from: small[$0], to: small[$0 + 1]) }
+        let fields = (0..<(frames.count - 1)).map { flow(from: small[$0], to: small[$0 + 1]) }
+        #if DEBUG
+        let succeeded = fields.compactMap { $0 }
+        let mags = succeeded.map { $0.maxMagnitude }
+        let measured = succeeded.first.map { Int($0.measuredWidth) } ?? 0
+        Logger(subsystem: "long-exposures", category: "flow").debug(
+            "flow: \(succeeded.count)/\(fields.count) pairs OK, measured@\(measured)px, maxMag min/avg/max = \(mags.min() ?? 0, format: .fixed(precision: 1))/\((mags.reduce(0, +) / Float(max(mags.count, 1))), format: .fixed(precision: 1))/\(mags.max() ?? 0, format: .fixed(precision: 1)) px")
+        #endif
+        return fields
     }
 
     /// Computes `flows(for:using:)` off the calling actor.
