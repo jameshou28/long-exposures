@@ -6,16 +6,11 @@ import {
   type CSSProperties,
 } from "react";
 
-/* ============================================================== *
- *  Long Exposures — instrument/darkroom landing                  *
- *  Register: brand. Photos carry color; blue is a signal only.   *
- * ============================================================== */
-
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
-/* --- mechanical entrance: default-visible; only arm + animate elements that
-       start below the fold. Anything already in view (or reduced-motion, or no JS)
-       keeps the visible default and never gets clipped/faded. --- */
+// mechanical entrance: default-visible; only arm + animate elements that
+// start below the fold, so anything already in view keeps its visible default
+
 function useRise<T extends HTMLElement>(opts?: { variant?: "rise" | "wipe" }) {
   const ref = useRef<T | null>(null);
   useEffect(() => {
@@ -43,8 +38,7 @@ function useRise<T extends HTMLElement>(opts?: { variant?: "rise" | "wipe" }) {
       { threshold: 0.2, rootMargin: "0px 0px -6% 0px" }
     );
     obs.observe(el);
-    // Safety net: if the observer never fires (background tab, no scroll),
-    // reveal anyway so content is never permanently hidden.
+    // fallback: reveal anyway if the observer never fires
     const fallback = window.setTimeout(reveal, 2500);
     return () => {
       obs.disconnect();
@@ -73,8 +67,7 @@ function Rise({
   );
 }
 
-/* ------------------------------- icons ------------------------------- */
-/* Hairline, instrument-panel style. */
+// icons
 
 function ApertureMark({ className = "" }: { className?: string }) {
   return (
@@ -96,14 +89,12 @@ function Glyph({ d, className = "" }: { d: string; className?: string }) {
   );
 }
 
-/* ---------------------------- small atoms ---------------------------- */
+// small atoms
 
 function Mono({ children, className = "", style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
   return <span className={`font-mono text-[10px] uppercase tracking-[0.14em] ${className}`} style={style}>{children}</span>;
 }
 
-/* The page's one set of section markers — a real sequence (the pipeline),
-   not a decorative eyebrow on every heading. */
 function SectionLabel({ index, name }: { index: string; name: string }) {
   return (
     <div className="flex items-center gap-3 text-ink-3">
@@ -114,7 +105,7 @@ function SectionLabel({ index, name }: { index: string; name: string }) {
   );
 }
 
-/* ============================== NAV ============================== */
+// nav
 
 const LINKS = [
   { label: "Frames", href: "#frames" },
@@ -206,10 +197,7 @@ function Nav() {
   );
 }
 
-/* ==================== BEFORE / AFTER SLIDER ==================== *
- *  Drag the divider to wipe between two app screenshots — Align   *
- *  off (smeary) vs on (sharp). Pointer + keyboard accessible.     *
- * ============================================================== */
+// before/after slider
 
 function BeforeAfterSlider({
   before,
@@ -265,7 +253,7 @@ function BeforeAfterSlider({
         className="relative w-full touch-none select-none overflow-hidden bg-base"
         style={{ aspectRatio: "9 / 16", maxHeight: "70vh" }}
       >
-        {/* AFTER (aligned) fills the frame; BEFORE is clipped on top from the left. */}
+        {/* after image fills the frame; before is clipped on top from the left */}
         <img src={after} alt={afterAlt} draggable={false} className="absolute inset-0 h-full w-full object-contain" />
         <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}>
           <img src={before} alt={beforeAlt} draggable={false} className="absolute inset-0 h-full w-full object-contain" />
@@ -279,7 +267,7 @@ function BeforeAfterSlider({
           <Mono className="text-signal-soft">{afterLabel}</Mono>
         </span>
 
-        {/* divider + machined handle */}
+        {/* divider handle */}
         <div className="pointer-events-none absolute inset-y-0" style={{ left: `${pos}%`, transform: "translateX(-50%)" }}>
           <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-signal/90 shadow-[0_0_12px_rgba(45,140,255,0.6)]" />
           <button
@@ -310,17 +298,7 @@ function BeforeAfterSlider({
   );
 }
 
-/* ===================== PHOTO PLACEHOLDER ====================== *
- *  Honest, labeled film-frame slot. NOT disguised as final art. *
- *  Swap `src` in PHOTOS[] when real exposures are dropped in.    *
- * ============================================================== */
-
-/* ========================= HERO RESULT ========================= *
- *  The hero visual: one finished long exposure, framed as the     *
- *  output of a clip. A top readout names the video source ("from  *
- *  N frames") so it reads as motion → stillness, not a still      *
- *  photo. Placeholder until a real exported exposure is dropped in.*
- * ============================================================== */
+// hero result
 
 function HeroResult({
   src,
@@ -335,7 +313,7 @@ function HeroResult({
 }) {
   return (
     <figure className="group relative overflow-hidden border border-line bg-panel-2">
-      {/* readout bar — the "clip → exposure" provenance */}
+      {/* readout bar */}
       <figcaption className="flex items-center justify-between border-b border-line bg-panel px-4 py-2.5 sm:px-5">
         <span className="flex items-center gap-2">
           <Glyph d="M4 7 a2 2 0 0 1 2 -2 h8 a2 2 0 0 1 2 2 v10 a2 2 0 0 1 -2 2 H6 a2 2 0 0 1 -2 -2 Z M18 9 L21 7 V17 L18 15" className="h-4 w-4 text-ink-3" />
@@ -357,7 +335,7 @@ function HeroResult({
             style={{ transitionTimingFunction: EASE }}
           />
         ) : (
-          /* honest placeholder — clearly a slot awaiting a real exposure */
+          // placeholder
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-base text-ink-3">
             <div className="absolute inset-0 ticks opacity-25" />
             <div className="pointer-events-none absolute inset-3 border border-dashed border-line-bright" />
@@ -367,7 +345,7 @@ function HeroResult({
           </div>
         )}
 
-        {/* exposure stamp, bottom corner */}
+        {/* exposure stamp */}
         <span className="pointer-events-none absolute bottom-3 right-3 bg-base/70 px-2 py-1 backdrop-blur-sm">
           <Mono className="tabular-nums text-ink-2">{exposure}</Mono>
         </span>
@@ -376,7 +354,7 @@ function HeroResult({
   );
 }
 
-/* ============================== MODES ============================== */
+// modes
 
 const MODES = [
   {
@@ -445,7 +423,7 @@ function ModeSwitch() {
   );
 }
 
-/* ============================== PAGE ============================== */
+// page
 
 const PIPELINE = [
   { d: "M4 12 H20 M20 12 L15 7 M20 12 L15 17", label: "Import a Live Photo or video — or capture a new clip in-app." },
@@ -460,10 +438,10 @@ export function LandingPage() {
       <Nav />
 
       <main>
-        {/* ============ HERO ============ */}
+        {/* hero */}
         <section className="mx-auto max-w-7xl px-5 pt-28 sm:px-8 sm:pt-32 md:pt-40">
           <div className="grid items-center gap-10 lg:grid-cols-12 lg:gap-12">
-            {/* headline column */}
+            {/* headline */}
             <div className="lg:col-span-7">
               <Rise>
                 <SectionLabel index="①" name="A darkroom in your pocket" />
@@ -493,7 +471,7 @@ export function LandingPage() {
               </Rise>
             </div>
 
-            {/* hero proof: the finished result, framed as a clip's output */}
+            {/* result */}
             <div className="lg:col-span-5">
               <Rise style={{ transitionDelay: "160ms" }}>
                 <HeroResult
@@ -508,7 +486,7 @@ export function LandingPage() {
 
         </section>
 
-        {/* ============ FRAMES / why you pick ============ */}
+        {/* frames */}
         <section id="frames" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 md:py-36">
           <div className="grid gap-12 lg:grid-cols-12">
             <div className="lg:col-span-5">
@@ -544,7 +522,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ============ CONTROL / modes + fine adjustments ============ */}
+        {/* control */}
         <section id="control" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 md:py-36">
           <Rise className="mb-12 max-w-3xl">
             <SectionLabel index="③" name="The controls" />
@@ -553,7 +531,7 @@ export function LandingPage() {
             </h2>
           </Rise>
 
-          {/* Align — shown as a live before/after wipe */}
+          {/* align */}
           <Rise className="grid items-stretch gap-px border border-line bg-line lg:grid-cols-[1fr_minmax(0,0.85fr)]">
             <div className="flex flex-col justify-center gap-5 bg-panel p-7 sm:p-10">
               <Glyph d="M4 4 H14 V14 H4 Z M10 10 H20 V20 H10 Z" className="h-7 w-7 text-signal-soft" />
@@ -578,7 +556,7 @@ export function LandingPage() {
             </div>
           </Rise>
 
-          {/* Blend mode — one clip, three photographs */}
+          {/* blend mode */}
           <Rise className="[&>div]:border-t-0">
             <ModeSwitch />
           </Rise>
@@ -599,10 +577,10 @@ export function LandingPage() {
             ))}
           </div>
 
-          {/* capture callout — distinct treatment, not another card in the grid */}
+          {/* capture */}
           <Rise className="mt-px border border-t-0 border-line bg-line">
             <div className="grid gap-px lg:grid-cols-[1fr_minmax(0,0.8fr)]">
-              {/* left: copy */}
+              {/* copy */}
               <div className="flex flex-col justify-center gap-4 bg-panel p-7 sm:p-10">
                 <Mono className="text-ink-3">In-app capture</Mono>
                 <h3 className="font-display text-[clamp(1.75rem,4vw,2.75rem)] font-bold leading-tight text-ink">
@@ -614,7 +592,7 @@ export function LandingPage() {
                 </p>
               </div>
 
-              {/* right: locked-capture spec readout */}
+              {/* spec readout */}
               <div className="flex flex-col justify-center bg-panel p-7 sm:p-10">
                 <Mono className="mb-5 text-ink-3">What locked capture means</Mono>
                 <dl className="flex flex-col divide-y divide-line">
@@ -638,7 +616,7 @@ export function LandingPage() {
           </Rise>
         </section>
 
-        {/* ============ GET ============ */}
+        {/* get */}
         <section id="get" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 md:py-40">
           <Rise className="flex flex-col items-start gap-8 border-t border-line pt-16 md:flex-row md:items-end md:justify-between">
             <div>
@@ -655,7 +633,7 @@ export function LandingPage() {
           </Rise>
         </section>
 
-        {/* ============ FOOTER ============ */}
+        {/* footer */}
         <footer className="border-t border-line">
           <div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
             <div className="flex items-center gap-2.5">
@@ -678,7 +656,7 @@ export function LandingPage() {
   );
 }
 
-/* ---- GitHub release badge ---- */
+// app store badge
 function AppStoreBadge({ size = "default" }: { size?: "compact" | "default" | "large" }) {
   const pad = size === "large" ? "px-6 py-4" : size === "compact" ? "px-3 py-1.5" : "px-5 py-3";
   const gap = size === "compact" ? "gap-2" : "gap-3";
@@ -694,7 +672,7 @@ function AppStoreBadge({ size = "default" }: { size?: "compact" | "default" | "l
       className={`group inline-flex items-center ${gap} border border-line-bright bg-ink text-base transition-all duration-300 hover:border-signal active:scale-[0.98] ${pad}`}
       style={{ transitionTimingFunction: EASE }}
     >
-      {/* GitHub mark */}
+      {/* logo */}
       <svg viewBox="0 0 24 24" className={logo} fill="currentColor" aria-hidden>
         <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .267.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
       </svg>

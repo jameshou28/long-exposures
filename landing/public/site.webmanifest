@@ -1,0 +1,13 @@
+{
+  "name": "Long Exposures",
+  "short_name": "Long Exposures",
+  "description": "Turn a Live Photo or video into a long exposure. You pick the frames.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0c0e",
+  "theme_color": "#0b0c0e",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon_1024.png", "sizes": "1024x1024", "type": "image/png" }
+  ]
+}
