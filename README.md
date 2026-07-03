@@ -105,21 +105,3 @@ long-exposures/           ← Xcode project
     PermissionPriming.swift ← Pre-permission explanation sheets
 landing/                  ← Marketing site (React + Vite → Vercel)
 ```
-
----
-
-## Development notes
-
-**The simulator can't exercise most of the pipeline.** It has no Live Photos and no
-camera, and Vision's optical-flow estimator (`VNGenerateOpticalFlowRequest`) can't run
-there at all — it fails with `Code=9 "Failed to create motion flow estimator"` on every
-frame pair, so **Smooth motion silently no-ops in the simulator** (the editor shows an
-orange "motion analysis isn't available" notice). Test blend, export, capture, and
-smooth motion on a real device.
-
-**Smooth-motion debug harness.** Launch the app (Debug build) with the `--flow-spike`
-argument and `FlowSpike.swift` synthesizes moving-square clips, runs the real flow +
-blend pipeline plus a hand-built ground-truth flow field, and writes PNGs and a report
-to the app container's `tmp/flowspike/`. On device, `moderate-mid.png` verifies
-Vision's flow direction convention: the square must sit halfway between its two frame
-positions. The harness is temporary — delete it once device verification is done.
