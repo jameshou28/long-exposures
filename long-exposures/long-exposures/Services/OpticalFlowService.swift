@@ -14,10 +14,10 @@
 //      upsample cleanly to preview or full resolution at warp time — the
 //      kernel rescales by `measuredWidth`, the same pattern
 //      RegistrationService uses for its translations.
-//    - Vision convention (verifiable with BlendEngine.renderIntermediate):
-//      the request targets the *later* frame and is performed on the earlier
-//      one, yielding — on the later frame's grid — per-pixel displacement
-//      from the earlier frame to the later one, in pixels at the measured size.
+//    - Vision convention: the request targets the *later* frame and is
+//      performed on the earlier one, yielding — on the later frame's grid —
+//      per-pixel displacement from the earlier frame to the later one, in
+//      pixels at the measured size.
 //    - A pair that fails just yields nil: the blend skips synthesis for that
 //      gap and keeps its ghosting (mirrors RegistrationService's
 //      identity-on-failure philosophy).
@@ -27,7 +27,6 @@ import Foundation
 import Vision
 import CoreImage
 import CoreVideo
-import os.log
 
 /// Dense optical flow for one consecutive frame pair, measured at a reduced
 /// resolution. Vectors are in pixels at `measuredWidth`, so they can be
@@ -56,13 +55,6 @@ nonisolated struct OpticalFlowService: Sendable {
         // Downsample each frame once, not once per pair.
         let small = frames.map { downsample($0, using: context) }
         let fields = (0..<(frames.count - 1)).map { flow(from: small[$0], to: small[$0 + 1]) }
-        #if DEBUG
-        let succeeded = fields.compactMap { $0 }
-        let mags = succeeded.map { $0.maxMagnitude }
-        let measured = succeeded.first.map { Int($0.measuredWidth) } ?? 0
-        Logger(subsystem: "long-exposures", category: "flow").debug(
-            "flow: \(succeeded.count)/\(fields.count) pairs OK, measured@\(measured)px, maxMag min/avg/max = \(mags.min() ?? 0, format: .fixed(precision: 1))/\((mags.reduce(0, +) / Float(max(mags.count, 1))), format: .fixed(precision: 1))/\(mags.max() ?? 0, format: .fixed(precision: 1)) px")
-        #endif
         return fields
     }
 

@@ -24,7 +24,6 @@ import Foundation
 import Metal
 import CoreVideo
 import CoreImage
-import os.log
 
 enum BlendMode: String, CaseIterable {
     case average
@@ -268,10 +267,6 @@ final class BlendEngine {
 
             let flowScale = Float(width) / Float(flow.measuredWidth)
             let samples = Self.sampleCount(for: flow, flowScale: flowScale)
-            #if DEBUG
-            os_log(.debug, "warp gap %d: maxMag %.1fpx @%dpx -> %.1fpx effective, %d samples",
-                   index, flow.maxMagnitude, width, flow.maxMagnitude * flowScale, samples)
-            #endif
             let shakeDelta = index < interpolation.shakeDeltas.count
                 ? interpolation.shakeDeltas[index] : SIMD2<Float>.zero
 
@@ -439,57 +434,6 @@ final class BlendEngine {
     func render(frame: CVPixelBuffer) throws -> CGImage {
         try blend(frames: [frame], bias: 0)
     }
-
-#if DEBUG
-    /// Spike helper for verifying Vision's flow direction convention by eye:
-    /// renders the single synthesized frame at `t` between `a` and `b` (dump it
-    /// via FrameDebugWriter and inspect). Correct convention puts a moving
-    /// subject `t` of the way from its position in `a` toward its position in
-    /// `b`; doubled means the flow is near-zero garbage, moved the wrong way
-    /// means the warp signs (or the handler/target order in
-    /// OpticalFlowService.flow) are flipped. Call it e.g. after import on two
-    /// preview frames of a panning clip.
-    func renderIntermediate(between a: CVPixelBuffer, and b: CVPixelBuffer,
-                            flow: FlowField, t: Float) throws -> CGImage {
-        let width = CVPixelBufferGetWidth(a)
-        let height = CVPixelBufferGetHeight(a)
-
-        let minTex = try makeAccumulator(width: width, height: height, fill: Self.minSeed)
-        let maxTex = try makeAccumulator(width: width, height: height, fill: 0)
-        let sumTex = try makeAccumulator(width: width, height: height, fill: 0)
-
-        guard let commandBuffer = commandQueue.makeCommandBuffer(),
-              let encoder = commandBuffer.makeComputeCommandEncoder() else {
-            throw BlendError.commandEncodingFailed
-        }
-        guard let aTexture = makeReadTexture(from: a),
-              let bTexture = makeReadTexture(from: b),
-              let flowTexture = makeFlowTexture(from: flow.buffer) else {
-            throw BlendError.textureAllocationFailed
-        }
-        encoder.setComputePipelineState(interpolatePipeline)
-        encoder.setTexture(aTexture, index: 0)
-        encoder.setTexture(bTexture, index: 1)
-        encoder.setTexture(flowTexture, index: 2)
-        encoder.setTexture(minTex, index: 3)
-        encoder.setTexture(maxTex, index: 4)
-        encoder.setTexture(sumTex, index: 5)
-        var params = WarpParams(t: t,
-                                flowScale: Float(width) / Float(flow.measuredWidth),
-                                shakeDelta: .zero)
-        encoder.setBytes(&params, length: MemoryLayout<WarpParams>.stride, index: 0)
-        dispatch(encoder, pipeline: interpolatePipeline, width: width, height: height)
-        encoder.endEncoding()
-
-        let output = try makeOutputTexture(width: width, height: height)
-        try encodeResolve(minTex: minTex, maxTex: maxTex, sumTex: sumTex,
-                          output: output, bias: 0, on: commandBuffer)
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        if commandBuffer.error != nil { throw BlendError.commandEncodingFailed }
-        return try cgImage(from: output)
-    }
-#endif
 
     // MARK: - Readback
 
