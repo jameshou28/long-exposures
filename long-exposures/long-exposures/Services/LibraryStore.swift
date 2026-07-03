@@ -2,9 +2,7 @@
 //  LibraryStore.swift
 //  long-exposures
 //
-//  The in-app library of saved long exposures. Images are JPEGs in
-//  Documents/Exposures; metadata is a single index.json alongside them. Fully
-//  on-device, independent of the system Photos library.
+//  In-app library of saved long exposures (jpegs). 
 //
 
 import Foundation
@@ -36,7 +34,6 @@ final class LibraryStore {
         UIImage(contentsOfFile: imageURL(for: exposure).path)
     }
 
-    /// Persists a rendered exposure: writes the JPEG and prepends it to the index.
     @discardableResult
     func add(image: CGImage, modeLabel: String, frameCount: Int) throws -> Exposure {
         let fileName = "\(UUID().uuidString).jpg"
@@ -65,7 +62,7 @@ final class LibraryStore {
             exposures = []
             return
         }
-        // Drop any entries whose image file is missing (e.g. manual deletion).
+        // drop any entries whose image file is missing (e.g. manual deletion).
         exposures = decoded.filter { FileManager.default.fileExists(atPath: imageURL(for: $0).path) }
     }
 

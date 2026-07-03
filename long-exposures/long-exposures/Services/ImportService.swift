@@ -2,7 +2,7 @@
 //  ImportService.swift
 //  long-exposures
 //
-//  Pulls frames out of a Live Photo (or any video) as BGRA pixel buffers.
+//  Pulls frames out of a live photo (or any video) as bgra pixel buffers.
 //
 
 import Foundation
@@ -44,7 +44,7 @@ struct ImportService {
         return asset
     }
 
-    /// Writes the paired video resource of a Live Photo asset to a temp file and returns its URL.
+    /// writes the paired video resource of a live photo to a temp file and returns its URL.
     func videoURL(for asset: PHAsset) async throws -> URL {
         let resources = PHAssetResource.assetResources(for: asset)
         let candidate = resources.first(where: { $0.type == .pairedVideo })
@@ -71,28 +71,22 @@ struct ImportService {
         }
     }
 
-    /// Most frames we keep from one clip. A Live Photo's paired video is well under
-    /// this; long regular videos are sampled down so memory and the timeline stay
-    /// bounded. Every kept frame is held full-res, so this is a real ceiling.
+    /// max frames to include - really only effects the vids not live photos
     static let maxFrames = 167
 
-    /// Decodes a video URL to BGRA CVPixelBuffers, evenly sampling down to
-    /// `maxFrames` for long clips. Faster than AVAssetImageGenerator for a sweep.
     func extractFrames(from url: URL) async throws -> [CVPixelBuffer] {
         let asset = AVURLAsset(url: url)
         let tracks = try await asset.loadTracks(withMediaType: .video)
         guard let track = tracks.first else { throw ImportError.noVideoTrack }
 
-        // Estimate the total frame count to pick a sampling stride. We don't know
-        // the exact count up front, so estimate from duration × frame rate and keep
-        // every Nth frame. A short clip gets stride 1 (every frame).
+        // estimate the total frame count
         let stride = await sampleStride(for: asset, track: track)
 
         let reader = try AVAssetReader(asset: asset)
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
             kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
         ])
-        // Copy so buffers we keep aren't reused by the reader's pool.
+        // copy so buffers kept aren't reused by the reader's pool
         output.alwaysCopiesSampleData = true
         reader.add(output)
 
@@ -104,7 +98,6 @@ struct ImportService {
         var index = 0
         while let sample = output.copyNextSampleBuffer() {
             defer { index += 1 }
-            // Keep every `stride`-th frame; cap total in case the estimate was low.
             guard index % stride == 0, frames.count < Self.maxFrames else { continue }
             if let buffer = CMSampleBufferGetImageBuffer(sample) {
                 frames.append(buffer)
@@ -118,8 +111,7 @@ struct ImportService {
         return frames
     }
 
-    /// Stride that keeps a clip at or under `maxFrames`, sampled evenly. Returns 1
-    /// (keep every frame) for short clips or when the count can't be estimated.
+    /// stride that keeps a clip at or under `maxFrames`, sampled evenly
     private func sampleStride(for asset: AVAsset, track: AVAssetTrack) async -> Int {
         guard let duration = try? await asset.load(.duration),
               let frameRate = try? await track.load(.nominalFrameRate),
@@ -131,23 +123,20 @@ struct ImportService {
         return Int((Double(estimatedTotal) / Double(Self.maxFrames)).rounded(.up))
     }
 
-    /// Convenience: PHAsset → paired video URL → frames. Deletes the temp video
-    /// it wrote once decoding finishes (success or failure) so it doesn't linger.
     func extractFrames(from asset: PHAsset) async throws -> [CVPixelBuffer] {
         let url = try await videoURL(for: asset)
         defer { Self.removeTempFile(url) }
         return try await extractFrames(from: url)
     }
 
-    /// Removes a file we wrote into the temp directory. No-op for anything outside it.
+    /// rm a file from temp directory
     static func removeTempFile(_ url: URL) {
         let tempDir = FileManager.default.temporaryDirectory.standardizedFileURL.path
         guard url.standardizedFileURL.path.hasPrefix(tempDir) else { return }
         try? FileManager.default.removeItem(at: url)
     }
 
-    /// One-shot cleanup of leftover temp video files from earlier runs (e.g. an
-    /// import that crashed before its `defer` ran). Safe to call at launch.
+    /// cleanup of leftover temp video files from earlier runs
     static func purgeTempVideos() {
         let fm = FileManager.default
         let tempDir = fm.temporaryDirectory

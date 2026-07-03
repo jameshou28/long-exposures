@@ -6,17 +6,6 @@
 //  produces consistent frames, which sidesteps the exposure-flicker problem
 //  normalization solves for imported clips.
 //
-//  Flow:
-//    1. Configure an AVCaptureSession with the back camera + a BGRA video data output.
-//    2. Show the live feed (CapturePreview).
-//    3. On record: lock exposure (custom mode, current duration/ISO) and white
-//       balance, then collect every frame the data output delivers.
-//    4. On stop: hand the collected BGRA buffers to the same FrameStore the
-//       importer feeds. The rest of the pipeline is unchanged.
-//
-//  Threading: AVCaptureSession and its objects aren't Sendable and must be touched
-//  on one serial queue. `SessionController` confines all of that to `sessionQueue`;
-//  `CaptureService` is the @MainActor, @Observable face that drives the SwiftUI view.
 
 import Foundation
 import AVFoundation
@@ -41,7 +30,7 @@ enum CaptureError: LocalizedError {
 final class CaptureService {
 
     enum State {
-        case idle        // configured, previewing, not recording
+        case idle // configured, previewing, not recording
         case recording
         case finished
     }
@@ -53,7 +42,7 @@ final class CaptureService {
 
     @ObservationIgnored private let controller = SessionController()
 
-    /// The session the preview layer renders. Exposed for `CapturePreview`.
+    /// what the preview layer renders. Exposed for CapturePreview.
     var session: AVCaptureSession { controller.session }
 
     static func requestAuthorization() async -> AVAuthorizationStatus {
@@ -65,7 +54,7 @@ final class CaptureService {
         return status
     }
 
-    /// Builds the session and starts previewing. Idempotent.
+    /// builds the session and starts previewing.
     func configure() async {
         guard !isConfigured else { return }
         let status = await Self.requestAuthorization()
@@ -89,7 +78,7 @@ final class CaptureService {
         controller.stopSession()
     }
 
-    /// Locks exposure + white balance, then starts collecting frames.
+    /// locks exposure + white balance and collects frames.
     func startRecording() {
         guard state == .idle, isConfigured else { return }
         controller.startRecording()
@@ -98,7 +87,7 @@ final class CaptureService {
         pollFrameCount()
     }
 
-    /// Stops collecting and returns the captured BGRA frames.
+    /// stops collecting and returns bgra frames.
     func stopRecording() async -> [CVPixelBuffer] {
         guard state == .recording else { return [] }
         let frames = await controller.stopRecording()
@@ -107,7 +96,7 @@ final class CaptureService {
         return frames
     }
 
-    /// Mirror the collector's running count to the observable property while recording.
+    /// mirror collector's running count to the observable property while recording.
     private func pollFrameCount() {
         guard state == .recording else { return }
         Task { @MainActor [weak self] in
@@ -119,9 +108,6 @@ final class CaptureService {
     }
 }
 
-/// Owns the AVCaptureSession and all its non-Sendable objects, confining every
-/// access to a single serial queue. `@unchecked Sendable` because that queue
-/// confinement is the safety guarantee, not the type system.
 private final class SessionController: @unchecked Sendable {
 
     let session = AVCaptureSession()
@@ -222,9 +208,7 @@ private final class SessionController: @unchecked Sendable {
     }
 }
 
-/// Collects BGRA frames on the session queue. Buffers are copied out of the
-/// output's reuse pool so they stay valid after the delegate returns. All access
-/// is serialized on that queue, so no internal locking is needed.
+/// collects bgra frames on the session queue
 private final class FrameCollector: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
 
     private var isCollecting = false
@@ -253,11 +237,11 @@ private final class FrameCollector: NSObject, AVCaptureVideoDataOutputSampleBuff
 }
 
 private extension CVPixelBuffer {
-    /// Copies a BGRA pixel buffer so it survives past the data output's reuse pool.
     func deepCopyBGRA() -> CVPixelBuffer? {
         let width = CVPixelBufferGetWidth(self)
         let height = CVPixelBufferGetHeight(self)
         var copy: CVPixelBuffer?
+        
         let attrs: [CFString: Any] = [
             kCVPixelBufferPixelFormatTypeKey: Int(kCVPixelFormatType_32BGRA),
             kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary
@@ -279,6 +263,8 @@ private extension CVPixelBuffer {
         if srcRow == dstRow {
             memcpy(dstBase, srcBase, srcRow * height)
         } else {
+
+
             let rowBytes = min(srcRow, dstRow)
             for y in 0..<height {
                 memcpy(dstBase + y * dstRow, srcBase + y * srcRow, rowBytes)
