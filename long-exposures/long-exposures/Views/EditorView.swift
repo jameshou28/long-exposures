@@ -124,7 +124,7 @@ struct EditorView: View {
                 title: "Smooth motion",
                 caption: model.flowUnavailable
                     ? "motion analysis isn't available for this clip — nothing was smoothed"
-                    : "fill gaps between frames so fast motion streaks instead of ghosting",
+                    : "fill gaps between frames",
                 isOn: $model.interpolationEnabled,
                 isWarning: model.flowUnavailable
             )
