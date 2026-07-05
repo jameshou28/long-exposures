@@ -67,6 +67,25 @@ enum BlendError: LocalizedError {
     }
 }
 
+final class BlendAccumulator {
+    let width: Int
+    let height: Int
+    let minTex: MTLTexture
+    let maxTex: MTLTexture
+    let sumTex: MTLTexture
+
+    fileprivate(set) var frameCount = 0
+
+    fileprivate init(width: Int, height: Int,
+                     minTex: MTLTexture, maxTex: MTLTexture, sumTex: MTLTexture) {
+        self.width = width
+        self.height = height
+        self.minTex = minTex
+        self.maxTex = maxTex
+        self.sumTex = sumTex
+    }
+}
+
 final class BlendEngine {
 
     private let device: MTLDevice
@@ -183,48 +202,16 @@ final class BlendEngine {
 
         var dispatchedAny = false
         for (index, frame) in frames.enumerated() {
-            guard let frameTexture = makeReadTexture(from: frame) else {
-                throw BlendError.textureAllocationFailed
-            }
-            if dispatchedAny {
-                encoder.memoryBarrier(scope: .textures)
-            }
-            encoder.setComputePipelineState(accumulatePipeline)
-            encoder.setTexture(frameTexture, index: 0)
-            encoder.setTexture(minTex, index: 1)
-            encoder.setTexture(maxTex, index: 2)
-            encoder.setTexture(sumTex, index: 3)
-            dispatch(encoder, pipeline: accumulatePipeline, width: width, height: height)
+            let next = index + 1 < frames.count ? frames[index + 1] : nil
+            let flow = interpolation.flatMap { index < $0.flows.count ? $0.flows[index] : nil }
+            let shakeDelta = interpolation.flatMap {
+                index < $0.shakeDeltas.count ? $0.shakeDeltas[index] : nil
+            } ?? .zero
+            try encodeAccumulate(frame: frame, next: next, flow: flow, shakeDelta: shakeDelta,
+                                 width: width, height: height,
+                                 minTex: minTex, maxTex: maxTex, sumTex: sumTex,
+                                 on: encoder, barrierBefore: dispatchedAny)
             dispatchedAny = true
-
-            guard let interpolation, index < interpolation.flows.count,
-                  index + 1 < frames.count,
-                  let flow = interpolation.flows[index],
-                  let flowTexture = makeFlowTexture(from: flow.buffer),
-                  let nextTexture = makeReadTexture(from: frames[index + 1])
-            else { continue }
-
-            let flowScale = Float(width) / Float(flow.measuredWidth)
-            let samples = Self.sampleCount(for: flow, flowScale: flowScale)
-            let shakeDelta = index < interpolation.shakeDeltas.count
-                ? interpolation.shakeDeltas[index] : SIMD2<Float>.zero
-
-            encoder.setComputePipelineState(interpolatePipeline)
-            encoder.setTexture(frameTexture, index: 0)
-            encoder.setTexture(nextTexture, index: 1)
-            encoder.setTexture(flowTexture, index: 2)
-            encoder.setTexture(minTex, index: 3)
-            encoder.setTexture(maxTex, index: 4)
-            encoder.setTexture(sumTex, index: 5)
-            for k in 1...samples {
-                encoder.memoryBarrier(scope: .textures)
-                var params = WarpParams(
-                    t: Float(k) / Float(samples + 1),
-                    flowScale: flowScale,
-                    shakeDelta: shakeDelta)
-                encoder.setBytes(&params, length: MemoryLayout<WarpParams>.stride, index: 0)
-                dispatch(encoder, pipeline: interpolatePipeline, width: width, height: height)
-            }
         }
         encoder.endEncoding()
 
@@ -240,6 +227,98 @@ final class BlendEngine {
         }
 
         return try cgImage(from: output)
+    }
+
+    /// create build up video
+    func makeAccumulator(width: Int, height: Int) throws -> BlendAccumulator {
+        let minTex = try makeAccumulator(width: width, height: height, fill: Self.minSeed)
+        let maxTex = try makeAccumulator(width: width, height: height, fill: 0)
+        let sumTex = try makeAccumulator(width: width, height: height, fill: 0)
+
+        return BlendAccumulator(width: width, height: height,
+                                minTex: minTex, maxTex: maxTex, sumTex: sumTex)
+    }
+
+    func accumulate(_ frame: CVPixelBuffer, next: CVPixelBuffer?, flow: FlowField?,
+                    shakeDelta: SIMD2<Float>, into acc: BlendAccumulator) throws {
+        guard let commandBuffer = commandQueue.makeCommandBuffer(),
+              let encoder = commandBuffer.makeComputeCommandEncoder() else {
+            throw BlendError.commandEncodingFailed
+        }
+
+        try encodeAccumulate(frame: frame, next: next, flow: flow, shakeDelta: shakeDelta,
+                             width: acc.width, height: acc.height,
+                             minTex: acc.minTex, maxTex: acc.maxTex, sumTex: acc.sumTex,
+                             on: encoder, barrierBefore: false)
+        encoder.endEncoding()
+
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        if commandBuffer.error != nil { throw BlendError.commandEncodingFailed }
+        acc.frameCount += 1
+    }
+
+    func resolve(_ acc: BlendAccumulator, bias: Float) throws -> CGImage {
+        guard acc.frameCount > 0 else { throw BlendError.noFrames }
+        guard let commandBuffer = commandQueue.makeCommandBuffer() else {
+            throw BlendError.commandEncodingFailed
+        }
+        
+        let output = try makeOutputTexture(width: acc.width, height: acc.height)
+        try encodeResolve(minTex: acc.minTex, maxTex: acc.maxTex, sumTex: acc.sumTex,
+                          output: output, bias: bias, on: commandBuffer)
+
+
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        if commandBuffer.error != nil { throw BlendError.commandEncodingFailed }
+        return try cgImage(from: output)
+    }
+
+    private func encodeAccumulate(frame: CVPixelBuffer, next: CVPixelBuffer?,
+                                  flow: FlowField?, shakeDelta: SIMD2<Float>,
+                                  width: Int, height: Int,
+                                  minTex: MTLTexture, maxTex: MTLTexture, sumTex: MTLTexture,
+                                  on encoder: MTLComputeCommandEncoder,
+                                  barrierBefore: Bool) throws {
+        guard let frameTexture = makeReadTexture(from: frame) else {
+            throw BlendError.textureAllocationFailed
+        }
+        if barrierBefore { encoder.memoryBarrier(scope: .textures) }
+
+        encoder.setComputePipelineState(accumulatePipeline)
+        encoder.setTexture(frameTexture, index: 0)
+        encoder.setTexture(minTex, index: 1)
+        encoder.setTexture(maxTex, index: 2)
+        encoder.setTexture(sumTex, index: 3)
+
+        dispatch(encoder, pipeline: accumulatePipeline, width: width, height: height)
+
+        guard let next, let flow,
+              let flowTexture = makeFlowTexture(from: flow.buffer),
+              let nextTexture = makeReadTexture(from: next)
+        else { return }
+
+        let flowScale = Float(width) / Float(flow.measuredWidth)
+        let samples = Self.sampleCount(for: flow, flowScale: flowScale)
+
+        encoder.setComputePipelineState(interpolatePipeline)
+        encoder.setTexture(frameTexture, index: 0)
+        encoder.setTexture(nextTexture, index: 1)
+        encoder.setTexture(flowTexture, index: 2)
+        encoder.setTexture(minTex, index: 3)
+        encoder.setTexture(maxTex, index: 4)
+        encoder.setTexture(sumTex, index: 5)
+
+        for k in 1...samples {
+            encoder.memoryBarrier(scope: .textures)
+            var params = WarpParams(
+                t: Float(k) / Float(samples + 1),
+                flowScale: flowScale,
+                shakeDelta: shakeDelta)
+            encoder.setBytes(&params, length: MemoryLayout<WarpParams>.stride, index: 0)
+            dispatch(encoder, pipeline: interpolatePipeline, width: width, height: height)
+        }
     }
 
     private static func sampleCount(for flow: FlowField, flowScale: Float) -> Int {

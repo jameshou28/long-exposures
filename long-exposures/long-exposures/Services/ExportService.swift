@@ -61,4 +61,15 @@ struct ExportService {
             PHAssetChangeRequest.creationRequestForAsset(from: uiImage)
         }
     }
+
+    /// saves a video file to the system photos library.
+    static func saveVideoToPhotos(_ url: URL) async throws {
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard status == .authorized || status == .limited else {
+            throw ImportError.authorizationDenied
+        }
+        try await PHPhotoLibrary.shared().performChanges {
+            PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+        }
+    }
 }

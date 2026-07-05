@@ -82,6 +82,17 @@ final class EditorViewModel {
     var exportMessage: String?
     var exportResolution: ExportResolution = .full
 
+    // build-up video export
+    var isExportingVideo = false
+    var videoProgress: Double = 0
+    var videoURL: URL?
+
+    @ObservationIgnored private let ciContext = CIContext()
+
+    /// build-up video tuning: ~4s body + ~1s tail at 30fps
+    private static let videoFPS = 30
+    private static let videoLongEdgeCap: CGFloat = 1080
+
     private var blendTask: Task<Void, Never>?
     private let library: LibraryStore
 
@@ -200,6 +211,71 @@ final class EditorViewModel {
             }
         } catch {
             exportMessage = "Export failed: \(error.localizedDescription)"
+        }
+    }
+
+    /// Renders build up vid
+    func exportVideo() async {
+        guard frameStore.fullResolutionFrames.count > 0 else { return }
+        let start = min(selectionStart, selectionEnd)
+        let end = max(selectionStart, selectionEnd)
+        let bias = Float(blendBias)
+
+        guard end - start + 1 >= 2 else {
+            exportMessage = "Select at least two frames for a build-up video."
+            return
+        }
+
+        isExportingVideo = true
+        videoProgress = 0
+        videoURL = nil
+        exportMessage = "Rendering build-up video…"
+        defer { isExportingVideo = false }
+
+        do {
+            let frames = await frameStore.fullResolutionFrames(for: start...end)
+            guard frames.count >= 2 else { return }
+            let interpolation = interpolationEnabled
+                ? await frameStore.interpolation(for: start...end)?.sliced(to: start...end)
+                : nil
+
+            let fps = Self.videoFPS
+            let holdFrames = fps
+            let maxBodyFrames = fps * 4
+
+            guard let renderer = try BuildUpVideoRenderer(
+                engine: engine, frames: frames, interpolation: interpolation, bias: bias,
+                longEdgeCap: Self.videoLongEdgeCap, ciContext: ciContext,
+                maxBodyFrames: maxBodyFrames)
+            else {
+                exportMessage = "Not enough frames to build a video."
+                return
+            }
+
+            let totalFrames = renderer.indices.count + holdFrames
+            let service = VideoExportService()
+            let url = try await service.encode(
+                totalFrames: totalFrames, size: renderer.size, fps: fps,
+                frameProvider: { try renderer.composite(at: $0) },
+                onProgress: { [weak self] fraction in
+                    Task { @MainActor in self?.videoProgress = fraction }
+                })
+
+            videoURL = url
+            videoProgress = 1
+            exportMessage = "Video ready to share."
+        } catch {
+            exportMessage = "Video export failed: \(error.localizedDescription)"
+        }
+    }
+
+    func saveVideoToPhotos() async {
+        guard let videoURL else { return }
+        do {
+            try await ExportService.saveVideoToPhotos(videoURL)
+            exportMessage = "Video saved to Photos."
+        } catch {
+            exportMessage = "Couldn't save video: \(error.localizedDescription)"
         }
     }
 }

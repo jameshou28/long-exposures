@@ -12,6 +12,7 @@ import SwiftUI
 struct EditorView: View {
 
     @Bindable var model: EditorViewModel
+    @State private var isSharingVideo = false
 
     var body: some View {
         VStack(spacing: 20) {
@@ -49,16 +50,51 @@ struct EditorView: View {
                 }
                 .buttonStyle(.borderedProminent)
             }
-            .disabled(model.isExporting)
+            .disabled(model.isExporting || model.isExportingVideo)
 
-            if model.isExporting {
+            Button {
+                Task { await model.exportVideo() }
+            } label: {
+                Label("Build-up video", systemImage: "film")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(model.isExporting || model.isExportingVideo)
+
+            if model.isExportingVideo {
+                ProgressView(value: model.videoProgress)
+            } else if model.isExporting {
                 ProgressView()
             }
+
+            if model.videoURL != nil && !model.isExportingVideo {
+                HStack(spacing: 12) {
+                    Button {
+                        Task { await model.saveVideoToPhotos() }
+                    } label: {
+                        Label("Save video", systemImage: "square.and.arrow.down")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        isSharingVideo = true
+                    } label: {
+                        Label("Share video", systemImage: "square.and.arrow.up")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+
             if let message = model.exportMessage {
                 Text(message)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+        .sheet(isPresented: $isSharingVideo) {
+            if let url = model.videoURL { ShareSheet(items: [url]) }
         }
     }
 
@@ -100,7 +136,7 @@ struct EditorView: View {
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(4.0 / 3.0, contentMode: .fit)
-        // Press and hold to compare the blend against a single sharp frame.
+        // press and hold to compare the blend against a single sharp frame.
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in if !model.isComparing { model.isComparing = true } }
