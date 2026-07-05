@@ -2,7 +2,7 @@
 //  VideoExportService.swift
 //  long-exposures
 //
-//  build up vid export
+//  Build-up (time-lapse) video export.
 //
 
 import Foundation
