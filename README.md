@@ -39,7 +39,7 @@ Long Exposures is an iOS app that turns your Live Photos and videos into real lo
 | **Match exposure** | Per-channel brightness gains correct the camera's auto-metering flicker between frames, so the blend comes out clean rather than banded. |
 | **Smooth motion** | Optical flow synthesizes in-between samples on the GPU, so fast subjects blur into a continuous streak instead of the discrete ghost that comes from low fps. |
 | **Blend** | A Metal GPU pipeline accumulates your frames in linear light and resolves them to sRGB. Three modes: **Average** for motion blur, **Lighten** for light trails, **Darken** for reflections and shadows. |
-| **Export** | Full-resolution render → JPEG, saved to the in-app library or straight to Photos. |
+| **Export** | Full-resolution render → JPEG, saved to the in-app library or straight to Photos. Or export a **build-up video** — a time-lapse `.mov` of the exposure accumulating frame by frame, ready to share. |
 
 ---
 
@@ -53,6 +53,7 @@ Long Exposures is an iOS app that turns your Live Photos and videos into real lo
 - **Exposure matching** — kills brightness flicker between frames
 - **Motion smoothing** — optical-flow in-betweens turn ghosted streaks continuous
 - **Before / After** — hold the preview to compare against the original frame
+- **Build-up video** — export a time-lapse of the exposure accumulating frame by frame, made to share
 - **In-app library** — browse, share, or save past exposures
 - **No account. No upload. No network.** All processing happens on your device.
 
@@ -65,6 +66,7 @@ Long Exposures is an iOS app that turns your Live Photos and videos into real lo
 | UI | SwiftUI |
 | GPU blend | Metal compute shaders |
 | Frame decode | AVFoundation (`AVAssetReader`) |
+| Video export | AVFoundation (`AVAssetWriter`, H.264) |
 | Registration | Vision (`VNTranslationalImageRegistrationRequest`) |
 | Motion smoothing | Vision (`VNGenerateOpticalFlowRequest`) + Metal warp kernel |
 | Color ops | Core Image |
@@ -87,8 +89,8 @@ long-exposures/           ← Xcode project
     RegistrationService.swift  ← Vision frame alignment
     NormalizationService.swift ← Per-frame exposure matching
     OpticalFlowService.swift   ← Per-pair dense flow for motion smoothing
-    FlowSpike.swift       ← Temporary DEBUG harness (--flow-spike) for smooth motion
-    ExportService.swift   ← Full-res render + save
+    ExportService.swift   ← Full-res render + save (image + video-to-Photos)
+    VideoExportService.swift   ← Build-up time-lapse .mov (AVAssetWriter H.264)
     CaptureService.swift  ← In-app locked-exposure video capture
     LibraryStore.swift    ← On-device JPEG library + index
   Models/
