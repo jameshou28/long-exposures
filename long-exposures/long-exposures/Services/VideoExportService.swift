@@ -202,10 +202,8 @@ struct VideoExportService {
             return outputURL
         }.value
     }
-
-
-    private static func pixelBuffer(from image: CGImage, pool: CVPixelBufferPool,
-                                    width: Int, height: Int) throws -> CVPixelBuffer {
+    private nonisolated static func pixelBuffer(from image: CGImage, pool: CVPixelBufferPool,
+                                                width: Int, height: Int) throws -> CVPixelBuffer {
         var buffer: CVPixelBuffer?
         guard CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &buffer) == kCVReturnSuccess,
               let pixelBuffer = buffer else {

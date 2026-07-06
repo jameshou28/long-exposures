@@ -2,9 +2,7 @@
 //  EditorView.swift
 //  long-exposures
 //
-//  The interactive editor. Preview canvas on top, mode picker, and a
-//  timeline strip with range handles below. Dragging the handles re-blends the
-//  selected frames live (at preview resolution).
+//  photo editting
 //
 
 import SwiftUI
@@ -13,92 +11,99 @@ struct EditorView: View {
 
     @Bindable var model: EditorViewModel
     @State private var isSharingVideo = false
+    @State private var adjustmentsExpanded = true
+    @State private var exportExpanded = true
 
     var body: some View {
         VStack(spacing: 16) {
             previewCanvas
-            // Controls scroll so a growing export section (e.g. the video
-            // buttons after a render) never steals height from the preview.
+                .padding(.horizontal)
             ScrollView {
                 VStack(spacing: 20) {
-                    modePicker
                     adjustments
-                    timelineSection
                     exportSection
                 }
+                .padding(.horizontal)
                 .padding(.top, 4)
             }
         }
-        .padding()
+        .padding(.top)
     }
 
     private var exportSection: some View {
-        VStack(spacing: 10) {
-            Picker("Resolution", selection: $model.exportResolution) {
-                Text("Full").tag(ExportResolution.full)
-                Text("Standard").tag(ExportResolution.standard)
-            }
-            .pickerStyle(.segmented)
-
-            HStack(spacing: 12) {
-                Button {
-                    Task { await model.export(saveToPhotos: false) }
-                } label: {
-                    Label("Save", systemImage: "square.and.arrow.down")
-                        .frame(maxWidth: .infinity)
+        DisclosureGroup(isExpanded: $exportExpanded) {
+            VStack(spacing: 10) {
+                Picker("Resolution", selection: $model.exportResolution) {
+                    Text("Full").tag(ExportResolution.full)
+                    Text("Standard").tag(ExportResolution.standard)
                 }
-                .buttonStyle(.bordered)
+                .pickerStyle(.segmented)
 
-                Button {
-                    Task { await model.export(saveToPhotos: true) }
-                } label: {
-                    Label("Save to Photos", systemImage: "photo.on.rectangle")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .disabled(model.isExporting || model.isExportingVideo)
-
-            Button {
-                Task { await model.exportVideo() }
-            } label: {
-                Label("Build-up video", systemImage: "film")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .disabled(model.isExporting || model.isExportingVideo)
-
-            if model.isExportingVideo {
-                ProgressView(value: model.videoProgress)
-            } else if model.isExporting {
-                ProgressView()
-            }
-
-            if model.videoURL != nil && !model.isExportingVideo {
                 HStack(spacing: 12) {
                     Button {
-                        Task { await model.saveVideoToPhotos() }
+                        Task { await model.export(saveToPhotos: false) }
                     } label: {
-                        Label("Save video", systemImage: "square.and.arrow.down")
+                        Label("Save", systemImage: "square.and.arrow.down")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
 
                     Button {
-                        isSharingVideo = true
+                        Task { await model.export(saveToPhotos: true) }
                     } label: {
-                        Label("Share video", systemImage: "square.and.arrow.up")
+                        Label("Save to Photos", systemImage: "photo.on.rectangle")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                 }
-            }
+                .disabled(model.isExporting || model.isExportingVideo)
 
-            if let message = model.exportMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Button {
+                    Task { await model.exportVideo() }
+                } label: {
+                    Label("Build-up video", systemImage: "film")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(model.isExporting || model.isExportingVideo)
+
+                if model.isExportingVideo {
+                    ProgressView(value: model.videoProgress)
+                } else if model.isExporting {
+                    ProgressView()
+                }
+
+                if model.videoURL != nil && !model.isExportingVideo {
+                    HStack(spacing: 12) {
+                        Button {
+                            Task { await model.saveVideoToPhotos() }
+                        } label: {
+                            Label("Save video", systemImage: "square.and.arrow.down")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button {
+                            isSharingVideo = true
+                        } label: {
+                            Label("Share video", systemImage: "square.and.arrow.up")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+
+                if let message = model.exportMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .padding(.top, 8)
+        } label: {
+            Text("Export")
+                .font(.headline)
+                .foregroundStyle(.black)
         }
         .sheet(isPresented: $isSharingVideo) {
             if let url = model.videoURL { ShareSheet(items: [url]) }
@@ -143,11 +148,8 @@ struct EditorView: View {
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(4.0 / 3.0, contentMode: .fit)
-        // Floor the height and let the preview claim space before the sibling
-        // controls yield theirs, so it never collapses when the stack is full.
         .frame(minHeight: 260)
         .layoutPriority(1)
-        // press and hold to compare the blend against a single sharp frame.
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in if !model.isComparing { model.isComparing = true } }
@@ -156,26 +158,55 @@ struct EditorView: View {
     }
 
     private var adjustments: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            toggleRow(
-                title: "Align frames",
-                caption: "basically tryna sharpen background",
-                isOn: $model.registrationEnabled
-            )
-            toggleRow(
-                title: "Match exposure",
-                caption: "even out brightness",
-                isOn: $model.normalizationEnabled
-            )
-            toggleRow(
-                title: "Smooth motion",
-                caption: model.flowUnavailable
-                    ? "motion analysis isn't available for this clip — nothing was smoothed"
-                    : "fill gaps between frames",
-                isOn: $model.interpolationEnabled,
-                isWarning: model.flowUnavailable
-            )
+        DisclosureGroup(isExpanded: $adjustmentsExpanded) {
+            VStack(alignment: .leading, spacing: 12) {
+                modePicker
+                toggleRow(
+                    title: "Align frames",
+                    caption: "Sharpen background",
+                    isOn: $model.registrationEnabled
+                )
+                toggleRow(
+                    title: "Match exposure",
+                    caption: "Even out the brightness",
+                    isOn: $model.normalizationEnabled
+                )
+                toggleRow(
+                    title: "Smooth motion",
+                    caption: model.flowUnavailable
+                        ? "motion analysis isn't available for this clip — nothing was smoothed"
+                        : "Fill gaps between frames",
+                    isOn: $model.interpolationEnabled,
+                    isWarning: model.flowUnavailable
+                )
+                timelineSection
+            }
+            .padding(.top, 8)
+        } label: {
+            HStack(spacing: 8) {
+                Text("Adjustments")
+                    .font(.headline)
+                    .foregroundStyle(.black)
+                if !adjustmentsExpanded {
+                    if model.flowUnavailable {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                            .font(.caption)
+                    } else if !activeAdjustments.isEmpty {
+                        Text(activeAdjustments.joined(separator: " · "))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
+    }
+    private var activeAdjustments: [String] {
+        var names: [String] = []
+        if model.registrationEnabled { names.append("Align") }
+        if model.normalizationEnabled { names.append("Exposure") }
+        if model.interpolationEnabled { names.append("Motion") }
+        return names
     }
 
     private func toggleRow(title: String, caption: String, isOn: Binding<Bool>,

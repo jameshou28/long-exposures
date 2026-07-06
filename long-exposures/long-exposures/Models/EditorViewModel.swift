@@ -258,7 +258,7 @@ final class EditorViewModel {
                 totalFrames: totalFrames, size: renderer.size, fps: fps,
                 frameProvider: { try renderer.composite(at: $0) },
                 onProgress: { [weak self] fraction in
-                    Task { @MainActor in self?.videoProgress = fraction }
+                    Task { @MainActor [weak self] in self?.videoProgress = fraction }
                 })
 
             videoURL = url
