@@ -100,6 +100,7 @@ struct EditorView: View {
                 }
             }
             .padding(.top, 8)
+            .padding(.horizontal, 4)
         } label: {
             Text("Export")
                 .font(.headline)
@@ -182,6 +183,7 @@ struct EditorView: View {
                 timelineSection
             }
             .padding(.top, 8)
+            .padding(.horizontal, 4)
         } label: {
             HStack(spacing: 8) {
                 Text("Adjustments")
@@ -248,6 +250,7 @@ struct EditorView: View {
                 selectionStart: $model.selectionStart,
                 selectionEnd: $model.selectionEnd
             )
+            .padding(.horizontal, 7)
             HStack {
                 Text("Frames \(min(model.selectionStart, model.selectionEnd) + 1)–\(max(model.selectionStart, model.selectionEnd) + 1)")
                 Spacer()
