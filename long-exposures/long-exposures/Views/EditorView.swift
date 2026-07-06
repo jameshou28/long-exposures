@@ -15,12 +15,19 @@ struct EditorView: View {
     @State private var isSharingVideo = false
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             previewCanvas
-            modePicker
-            adjustments
-            timelineSection
-            exportSection
+            // Controls scroll so a growing export section (e.g. the video
+            // buttons after a render) never steals height from the preview.
+            ScrollView {
+                VStack(spacing: 20) {
+                    modePicker
+                    adjustments
+                    timelineSection
+                    exportSection
+                }
+                .padding(.top, 4)
+            }
         }
         .padding()
     }
@@ -136,6 +143,10 @@ struct EditorView: View {
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(4.0 / 3.0, contentMode: .fit)
+        // Floor the height and let the preview claim space before the sibling
+        // controls yield theirs, so it never collapses when the stack is full.
+        .frame(minHeight: 260)
+        .layoutPriority(1)
         // press and hold to compare the blend against a single sharp frame.
         .gesture(
             DragGesture(minimumDistance: 0)

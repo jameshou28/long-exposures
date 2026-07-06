@@ -38,8 +38,8 @@ Long Exposures is an iOS app that turns your Live Photos and videos into real lo
 | **Align** | Vision estimates a per-frame translation and snaps the static background sharp, so handheld shake doesn't smear the scene you care about. |
 | **Match exposure** | Per-channel brightness gains correct the camera's auto-metering flicker between frames, so the blend comes out clean rather than banded. |
 | **Smooth motion** | Optical flow synthesizes in-between samples on the GPU, so fast subjects blur into a continuous streak instead of the discrete ghost that comes from low fps. |
-| **Blend** | A Metal GPU pipeline accumulates your frames in linear light and resolves them to sRGB. Three modes: **Average** for motion blur, **Lighten** for light trails, **Darken** for reflections and shadows. |
-| **Export** | Full-resolution render → JPEG, saved to the in-app library or straight to Photos. Or export a **build-up video** — a time-lapse `.mov` of the exposure accumulating frame by frame, ready to share. |
+| **Blend** | A Metal GPU pipeline accumulates your frames in linear light and resolves them to sRGB. Three modes: Average for motion blur, Lighten for light trails, Darken for reflections and shadows. |
+| **Export** | Full-resolution render -> JPEG, saved to the in-app library or straight to Photos. Or export a build-up video — a time-lapse `.mov` of the exposure accumulating frame by frame. |
 
 ---
 
@@ -48,11 +48,11 @@ Long Exposures is an iOS app that turns your Live Photos and videos into real lo
 - **Live Photo & video import** — any clip in your library works
 - **In-app capture** with locked exposure and white balance for consistent frames
 - **Interactive timeline** — see every frame, drag to choose your range
-- **Three blend modes** — Average · Lighten · Darken
+- **Three blend modes** — Average - Lighten - Darken
 - **Frame alignment** — keeps the background sharp on handheld shots
 - **Exposure matching** — kills brightness flicker between frames
 - **Motion smoothing** — optical-flow in-betweens turn ghosted streaks continuous
-- **Before / After** — hold the preview to compare against the original frame
+- **Before/After** — hold the preview to compare against the original frame
 - **Build-up video** — export a time-lapse of the exposure accumulating frame by frame, made to share
 - **In-app library** — browse, share, or save past exposures
 - **No account. No upload. No network.** All processing happens on your device.
@@ -80,30 +80,30 @@ No third-party packages. iOS 17+, iPhone only.
 ## Repository layout
 
 ```
-long-exposures/           ← Xcode project
+long-exposures/ 
   Engine/
-    BlendEngine.swift     ← Metal accumulate + resolve pipeline
-    BlendKernels.metal    ← GPU kernels (average / lighten / darken / resolve)
+    BlendEngine.swift     
+    BlendKernels.metal    
   Services/
-    ImportService.swift   ← PHAsset / video → CVPixelBuffer frames
-    RegistrationService.swift  ← Vision frame alignment
-    NormalizationService.swift ← Per-frame exposure matching
-    OpticalFlowService.swift   ← Per-pair dense flow for motion smoothing
-    ExportService.swift   ← Full-res render + save (image + video-to-Photos)
-    VideoExportService.swift   ← Build-up time-lapse .mov (AVAssetWriter H.264)
-    CaptureService.swift  ← In-app locked-exposure video capture
-    LibraryStore.swift    ← On-device JPEG library + index
+    ImportService.swift   
+    RegistrationService.swift
+    NormalizationService.swift
+    OpticalFlowService.swift  
+    ExportService.swift   
+    VideoExportService.swift
+    CaptureService.swift
+    LibraryStore.swift   
   Models/
-    FrameStore.swift      ← Full-res + preview buffer store
-    EditorViewModel.swift ← Selection state, debounced preview re-blend
-    Exposure.swift        ← Codable metadata for saved exposures
-    AppSettings.swift     ← UserDefaults-backed defaults
+    FrameStore.swift      
+    EditorViewModel.swift 
+    Exposure.swift        
+    AppSettings.swift     
   Views/
-    EditorView.swift      ← Preview canvas + controls
-    TimelineStrip.swift   ← Draggable range timeline
-    CaptureView.swift     ← Live camera preview + record button
-    LibraryView.swift     ← Saved exposures grid + detail
-    OnboardingView.swift  ← First-launch walkthrough
-    PermissionPriming.swift ← Pre-permission explanation sheets
-landing/                  ← Marketing site (React + Vite → Vercel)
+    EditorView.swift      
+    TimelineStrip.swift   
+    CaptureView.swift     
+    LibraryView.swift   
+    OnboardingView.swift
+    PermissionPriming.swift
+landing/                  
 ```
