@@ -2,8 +2,6 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 
-/* Self-contained logo mark, mirrored from the landing page so this entry
-   doesn't import the whole LandingPage module just for one glyph. */
 function ApertureMark({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 100 100" className={className} aria-hidden>
@@ -18,8 +16,6 @@ function ApertureMark({ className = "" }: { className?: string }) {
 
 const LAST_UPDATED = "June 25, 2026";
 
-/* Body copy is the policy text from SHIP.md, kept verbatim so the hosted page,
-   the App Store privacy field, and the repo all say the same thing. */
 const SECTIONS: { heading: string; body: string }[] = [
   {
     heading: "No data collected",
@@ -38,7 +34,6 @@ const SECTIONS: { heading: string; body: string }[] = [
 function PrivacyPage() {
   return (
     <div className="relative min-h-[100dvh] bg-base text-ink">
-      {/* slim top bar with a real back link to the landing page */}
       <header className="border-b border-line">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4 sm:px-8">
           <a href="/" className="flex items-center gap-2.5">
