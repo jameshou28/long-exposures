@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  long-exposures
 //
-//  Root view: import a Live Photo or video, then drive the interactive editor.
+//  import a Live Photo or video, then drive the interactive editor.
 //
 
 import SwiftUI
@@ -163,7 +163,6 @@ struct ContentView: View {
         .padding()
     }
 
-    /// Drops back to the landing screen so the user can choose Capture or Pick.
     private func returnToLanding() {
         editorModel = nil
         frameStore.clear()
@@ -186,7 +185,6 @@ struct ContentView: View {
         await requestAndCapture()
     }
 
-    /// After the priming screen's "Continue", trigger the real system prompt.
     private func proceedAfterPriming(_ kind: PermissionPriming.Kind) async {
         switch kind {
         case .photos: await requestAndPick()
@@ -249,7 +247,6 @@ struct ContentView: View {
                 let asset = try importService.asset(forLocalIdentifier: identifier)
                 frames = try await importService.extractFrames(from: asset)
             case .video(let url):
-                // We own this temp copy from the picker; delete it once decoded.
                 defer { ImportService.removeTempFile(url) }
                 frames = try await importService.extractFrames(from: url)
             }

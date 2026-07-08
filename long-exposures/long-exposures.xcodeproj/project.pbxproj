@@ -258,6 +258,7 @@
 				DEVELOPMENT_TEAM = 3KFNZ8GCK4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Long Exposures";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Long Exposures uses the camera to capture footage with locked exposure and white balance for cleaner blends.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Long Exposures reads Live Photos and videos from your library so you can blend them, and saves finished exposures back.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -292,6 +293,7 @@
 				DEVELOPMENT_TEAM = 3KFNZ8GCK4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Long Exposures";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Long Exposures uses the camera to capture footage with locked exposure and white balance for cleaner blends.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Long Exposures reads Live Photos and videos from your library so you can blend them, and saves finished exposures back.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
