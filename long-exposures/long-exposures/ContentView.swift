@@ -166,7 +166,7 @@ struct ContentView: View {
     private func returnToLanding() {
         editorModel = nil
         frameStore.clear()
-        statusMessage = "Pick a Live Photo or video, or capture one to begin."
+        statusMessage = "Pick a Live Photo or video, or capture one to begin"
     }
 
     private func beginPick() async {
