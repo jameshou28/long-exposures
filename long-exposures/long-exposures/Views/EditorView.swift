@@ -30,9 +30,9 @@ struct EditorView: View {
             .mask(
                 LinearGradient(
                     stops: [
-                        .init(color: .black.opacity(0.3), location: 0),
-                        .init(color: .black, location: 0.97),
-                        .init(color: .black.opacity(0.1), location: 1)
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: 0.85),
+                        .init(color: .clear, location: 1)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
