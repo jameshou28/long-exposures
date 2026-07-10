@@ -635,7 +635,7 @@ function AppStoreBadge({ size = "default" }: { size?: "compact" | "default" | "l
   const word = size === "large" ? "text-2xl" : size === "compact" ? "text-base" : "text-xl";
   return (
     <a
-      href="https://github.com/jameshou28/long-exposures/releases/tag/1.0"
+      href="https://github.com/jameshou28/long-exposures/releases/tag/1.2"
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Download Long Exposures from GitHub Releases"
