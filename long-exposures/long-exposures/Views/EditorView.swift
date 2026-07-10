@@ -25,7 +25,19 @@ struct EditorView: View {
                 }
                 .padding(.horizontal)
                 .padding(.top, 4)
+                .padding(.bottom, 24)
             }
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: 0.92),
+                        .init(color: .clear, location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
         }
         .padding(.top)
     }

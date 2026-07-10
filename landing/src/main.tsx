@@ -9,3 +9,4 @@ hydrateRoot(
     <LandingPage />
   </StrictMode>
 );
+
