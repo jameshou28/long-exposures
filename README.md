@@ -45,16 +45,16 @@ Long Exposures is an iOS app that turns your Live Photos and videos into real lo
 
 ## Features
 
-- **Live Photo & video import** — any clip in your library works
-- **In-app capture**  - locked exposure and white balance for consistent frames
-- **Interactive timeline** — see every frame, drag to choose your range
-- **Three blend modes** — Average - Lighten - Darken
-- **Frame alignment** — keeps the background sharp on handheld shots
-- **Exposure matching** — kills brightness flicker between frames
-- **Motion smoothing** — optical-flow in-betweens turn ghosted streaks continuous
-- **Before/After** — hold the preview to compare against the original frame
-- **Build-up video** — export a time-lapse of the exposure accumulating frame by frame
-- **In-app library** — browse, share, or save past exposures
+- **Live Photo & video import**: any clip in your library works
+- **In-app capture**: locked exposure and white balance for consistent frames
+- **Interactive timeline**: see every frame, drag to choose your range
+- **Three blend modes**: Average - Lighten - Darken
+- **Frame alignment**: keeps the background sharp on handheld shots
+- **Exposure matching**: kills brightness flicker between frames
+- **Motion smoothing**: optical-flow in-betweens turn ghosted streaks continuous
+- **Before/After**: hold the preview to compare against the original frame
+- **Build-up video**: export a time-lapse of the exposure accumulating frame by frame
+- **In-app library**: browse, share, or save past exposures
 
 ---
 
