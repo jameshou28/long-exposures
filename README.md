@@ -19,7 +19,7 @@
 
 ## What it does
 
-Long Exposures is an iOS app that turns your Live Photos and videos into real long-exposure shots. Pick a frame range. Choose a blend mode. Get motion blur, light trails, or glassy reflections without a tripod.
+Long Exposures is an iOS app that turns your Live Photos and videos into real long-exposure shots. You can pick a frame range, choose a blend mode, and get motion blur or light trails without a tripod.
 
 ---
 
@@ -33,29 +33,28 @@ Long Exposures is an iOS app that turns your Live Photos and videos into real lo
 
 | Step | What happens |
 |---|---|
-| **Import** | Your Live Photo's paired video (or any video clip) is decoded frame by frame — up to 120 frames, evenly sampled. Temp files are deleted the moment decoding finishes. |
-| **Select** | A scrollable thumbnail strip lets you drag two handles to pick exactly which frames enter the blend. |
-| **Align** | Vision estimates a per-frame translation and snaps the static background sharp, so handheld shake doesn't smear the scene you care about. |
-| **Match exposure** | Per-channel brightness gains correct the camera's auto-metering flicker between frames, so the blend comes out clean rather than banded. |
-| **Smooth motion** | Optical flow synthesizes in-between samples on the GPU, so fast subjects blur into a continuous streak instead of the discrete ghost that comes from low fps. |
-| **Blend** | A Metal GPU pipeline accumulates your frames in linear light and resolves them to sRGB. Three modes: Average for motion blur, Lighten for light trails, Darken for reflections and shadows. |
-| **Export** | Full-resolution render -> JPEG, saved to the in-app library or straight to Photos. Or export a build-up video — a time-lapse `.mov` of the exposure accumulating frame by frame. |
+| **Import** | Your Live Photo's video (or any video clip) is decoded frame by frame (up to 167 frames). |
+| **Select** | A scrollable thumbnail strip lets you drag two handles to pick exactly which frames you want in your long-exposure. |
+| **Align** | Vision estimates a per-frame translation and sharpens the static background to remove blur. |
+| **Match exposure** | Per-channel brightness gains correct the camera's auto-metering flicker between frames. |
+| **Smooth motion** | Optical flow synthesizes in-between samples on the GPU, to create continuous streaks, even with low fps videos. |
+| **Blend** | A Metal GPU pipeline accumulates your frames in linear light and resolves them to sRGB. You can then lighten or darken your image based on the effect you want for the long-exposure. |
+| **Export** | Full-resolution render -> JPEG, saved to the in-app library or your phone's photo library. You can also export a build-up video — a time-lapse `.mov` of the exposure accumulating frame by frame. |
 
 ---
 
 ## Features
 
 - **Live Photo & video import** — any clip in your library works
-- **In-app capture** with locked exposure and white balance for consistent frames
+- **In-app capture**  - locked exposure and white balance for consistent frames
 - **Interactive timeline** — see every frame, drag to choose your range
 - **Three blend modes** — Average - Lighten - Darken
 - **Frame alignment** — keeps the background sharp on handheld shots
 - **Exposure matching** — kills brightness flicker between frames
 - **Motion smoothing** — optical-flow in-betweens turn ghosted streaks continuous
 - **Before/After** — hold the preview to compare against the original frame
-- **Build-up video** — export a time-lapse of the exposure accumulating frame by frame, made to share
+- **Build-up video** — export a time-lapse of the exposure accumulating frame by frame
 - **In-app library** — browse, share, or save past exposures
-- **No account. No upload. No network.** All processing happens on your device.
 
 ---
 
