@@ -1,68 +1,6 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-  type CSSProperties,
-} from "react";
+import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
 
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
-
-function useRise<T extends HTMLElement>(opts?: { variant?: "rise" | "wipe" }) {
-  const ref = useRef<T | null>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) return;
-
-    const variant = opts?.variant ?? "rise";
-    const rect = el.getBoundingClientRect();
-    const belowFold = rect.top > window.innerHeight * 0.9;
-    if (!belowFold) return; 
-
-    el.classList.add(variant, "arm");
-    const reveal = () => el.classList.add("in");
-    const obs = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) {
-            reveal();
-            obs.unobserve(e.target);
-          }
-        }
-      },
-      { threshold: 0.2, rootMargin: "0px 0px -6% 0px" }
-    );
-    obs.observe(el);
-    const fallback = window.setTimeout(reveal, 2500);
-    return () => {
-      obs.disconnect();
-      window.clearTimeout(fallback);
-    };
-  }, [opts?.variant]);
-  return ref;
-}
-
-function Rise({
-  children,
-  className = "",
-  variant = "rise",
-  style,
-}: {
-  children: ReactNode;
-  className?: string;
-  variant?: "rise" | "wipe";
-  style?: CSSProperties;
-}) {
-  const ref = useRise<HTMLDivElement>({ variant });
-  return (
-    <div ref={ref} className={className} style={style}>
-      {children}
-    </div>
-  );
-}
-
 
 function ApertureMark({ className = "" }: { className?: string }) {
   return (
@@ -99,11 +37,6 @@ function SectionLabel({ index, name }: { index: string; name: string }) {
   );
 }
 
-const LINKS = [
-  { label: "Frames", href: "#frames" },
-  { label: "Controls", href: "#control" },
-];
-
 function Nav() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -134,14 +67,6 @@ function Nav() {
             </span>
           </a>
 
-          <nav className="hidden items-center gap-7 md:flex">
-            {LINKS.map((l) => (
-              <a key={l.href} href={l.href} className="text-[13px] text-ink-2 transition-colors duration-300 hover:text-ink">
-                {l.label}
-              </a>
-            ))}
-          </nav>
-
           <div className="hidden md:block">
             <AppStoreBadge size="compact" />
           </div>
@@ -163,24 +88,7 @@ function Nav() {
         className="fixed inset-0 z-[var(--z-overlay)] flex flex-col justify-center gap-2 bg-base/95 px-6 backdrop-blur-md transition-opacity duration-400 md:hidden"
         style={{ opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none", transitionTimingFunction: EASE }}
       >
-        {LINKS.map((l, i) => (
-          <a
-            key={l.href}
-            href={l.href}
-            onClick={() => setOpen(false)}
-            className="border-b border-line py-4 font-display text-4xl font-bold text-ink transition-all duration-500"
-            style={{
-              transform: open ? "translateX(0)" : "translateX(-1rem)",
-              opacity: open ? 1 : 0,
-              transitionDelay: `${open ? 60 + i * 50 : 0}ms`,
-              transitionTimingFunction: EASE,
-            }}
-          >
-            <span className="mr-4 font-mono text-sm text-ink-3">0{i + 1}</span>
-            {l.label}
-          </a>
-        ))}
-        <a href="#get" onClick={() => setOpen(false)} className="mt-6 inline-flex w-max items-center gap-2 bg-signal px-5 py-3 text-sm font-semibold text-base">
+        <a href="#get" onClick={() => setOpen(false)} className="inline-flex w-max items-center gap-2 bg-signal px-5 py-3 text-sm font-semibold text-base">
           Get the app
           <Glyph d="M7 17 L17 7 M9 7 H17 V15" className="h-4 w-4" />
         </a>
@@ -342,7 +250,7 @@ const MODES = [
     id: "average",
     name: "Average",
     use: "Silky motion blur",
-    body: "Every selected frame averaged in linear light. Flowing water turns to mist, clouds streak, a crowd dissolves to ghosts.",
+    body: "Every selected frame averaged in linear light. Flowing water turns to mist, clouds streak, a crowd fades out.",
   },
   {
     id: "lighten",
@@ -407,10 +315,10 @@ function ModeSwitch() {
 // page
 
 const PIPELINE = [
-  { d: "M4 12 H20 M20 12 L15 7 M20 12 L15 17", label: "Import a Live Photo or video — or capture a new clip in-app." },
-  { d: "M4 7 H20 M4 12 H20 M4 17 H20 M9 4 V20 M15 4 V20", label: "Drag the frame jaws to keep exactly the moment you want." },
-  { d: "M5 19 V9 M12 19 V5 M19 19 V13 M3 19 H21", label: "Pick a blend mode and watch the composite resolve live." },
-  { d: "M12 4 V14 M12 14 L8 10 M12 14 L16 10 M5 18 H19", label: "Export full-resolution to Photos. Nothing leaves the phone." },
+  { d: "M4 12 H20 M20 12 L15 7 M20 12 L15 17", label: "Import a Live Photo or video, or shoot a new clip in the app." },
+  { d: "M4 7 H20 M4 12 H20 M4 17 H20 M9 4 V20 M15 4 V20", label: "Drag the two handles to trim to the frames you want." },
+  { d: "M5 19 V9 M12 19 V5 M19 19 V13 M3 19 H21", label: "Pick a blend mode and watch the composite update live." },
+  { d: "M12 4 V14 M12 14 L8 10 M12 14 L16 10 M5 18 H19", label: "Export full resolution to Photos. Nothing leaves your phone." },
 ];
 
 export function LandingPage() {
@@ -422,10 +330,8 @@ export function LandingPage() {
         <section className="mx-auto max-w-7xl px-5 pt-28 sm:px-8 sm:pt-32 md:pt-40">
           <div className="grid items-center gap-10 lg:grid-cols-12 lg:gap-12">
             <div className="lg:col-span-7">
-              <Rise>
-                <SectionLabel index="①" name="A darkroom in your pocket" />
-              </Rise>
-              <Rise variant="wipe" className="mt-6">
+              <SectionLabel index="①" name="A darkroom in your pocket" />
+              <div className="mt-6">
                 <h1 className="font-display text-[clamp(3rem,9vw,5.75rem)] font-extrabold leading-[0.92] text-ink">
                   The long exposure
                   <br />
@@ -433,32 +339,29 @@ export function LandingPage() {
                   <br />
                   <span className="text-signal">your Live Photos.</span>
                 </h1>
-              </Rise>
-              <Rise className="mt-7" style={{ transitionDelay: "120ms" }}>
+              </div>
+              <div className="mt-7">
                 <p className="prose-pretty text-[17px] leading-relaxed text-ink-2">
-                  Feed it a clip you already shot. Long Exposures blends the frames you choose into
-                  a single photograph — tripod-grade water, light trails, motion blur. The phone
-                  does the work, and keeps it.
+                  Feed it a clip you already shot. Long Exposures blends the frames you pick into
+                  one photograph, right on your phone: tripod-grade water, light trails, motion blur.
                 </p>
-              </Rise>
-              <Rise className="mt-9 flex flex-wrap items-center gap-x-7 gap-y-4" style={{ transitionDelay: "200ms" }}>
+              </div>
+              <div className="mt-9 flex flex-wrap items-center gap-x-7 gap-y-4">
                 <AppStoreBadge />
                 <div className="flex items-center gap-2 text-[13px] text-ink-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-signal" />
                   100% on device · no account · nothing uploaded
                 </div>
-              </Rise>
+              </div>
             </div>
 
             <div className="lg:col-span-5">
-              <Rise style={{ transitionDelay: "160ms" }}>
-                <HeroResult
-                  src="/exposures/hero.jpg"
-                  alt="View of a busy street at night"
-                  frames={167}
-                  exposure="15s"
-                />
-              </Rise>
+              <HeroResult
+                src="/exposures/hero.jpg"
+                alt="View of a busy street at night"
+                frames={167}
+                exposure="15s"
+              />
             </div>
           </div>
 
@@ -467,32 +370,27 @@ export function LandingPage() {
         <section id="frames" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 md:py-36">
           <div className="grid gap-12 lg:grid-cols-12">
             <div className="lg:col-span-5">
-              <Rise>
-                <SectionLabel index="②" name="You pick the frames" />
-                <h2 className="mt-6 font-display text-[clamp(2.25rem,5vw,3.5rem)] font-bold leading-[0.98] text-ink">
-                  Apple's effect picks the moment. Here, you do.
-                </h2>
-                <p className="prose-pretty mt-6 text-[16px] leading-relaxed text-ink-2">
-                  The built-in Long Exposure gives you one automatic result and no way to change
-                  it. This is the manual control: a frame-by-frame timeline with two jaws. Trim to
-                  the exact stretch, choose how the frames combine, and the preview re-renders as
-                  you drag.
-                </p>
-              </Rise>
+              <SectionLabel index="②" name="You pick the frames" />
+              <h2 className="mt-6 font-display text-[clamp(2.25rem,5vw,3.5rem)] font-bold leading-[0.98] text-ink">
+                Apple's version picks the moment. This one, you control.
+              </h2>
+              <p className="prose-pretty mt-6 text-[16px] leading-relaxed text-ink-2">
+                The built-in Long Exposure gives you one result and no way to change it.
+                This is the manual version: a frame-by-frame timeline with two handles. Trim to
+                the exact range, pick a blend mode, and watch the preview update as you drag.
+              </p>
             </div>
 
             <div className="lg:col-span-7">
               <ol className="grid gap-px border border-line bg-line sm:grid-cols-2">
                 {PIPELINE.map((step, i) => (
-                  <Rise key={i} style={{ transitionDelay: `${i * 70}ms` }}>
-                    <li className="flex h-full list-none flex-col gap-4 bg-panel p-6 sm:p-7">
-                      <div className="flex items-center justify-between">
-                        <Glyph d={step.d} className="h-6 w-6 text-signal-soft" />
-                        <span className="font-mono text-sm tabular-nums text-ink-3">0{i + 1}</span>
-                      </div>
-                      <p className="text-[15px] leading-relaxed text-ink-2">{step.label}</p>
-                    </li>
-                  </Rise>
+                  <li key={i} className="flex h-full list-none flex-col gap-4 bg-panel p-6 sm:p-7">
+                    <div className="flex items-center justify-between">
+                      <Glyph d={step.d} className="h-6 w-6 text-signal-soft" />
+                      <span className="font-mono text-sm tabular-nums text-ink-3">0{i + 1}</span>
+                    </div>
+                    <p className="text-[15px] leading-relaxed text-ink-2">{step.label}</p>
+                  </li>
                 ))}
               </ol>
             </div>
@@ -500,23 +398,23 @@ export function LandingPage() {
         </section>
 
         <section id="control" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 md:py-36">
-          <Rise className="mb-12 max-w-3xl">
+          <div className="mb-12 max-w-3xl">
             <SectionLabel index="③" name="The controls" />
             <h2 className="mt-6 font-display text-[clamp(2.25rem,5vw,3.5rem)] font-bold leading-[0.98] text-ink">
-              The dials a real long exposure needs.
+              What a real long exposure needs.
             </h2>
-          </Rise>
+          </div>
 
-          <Rise className="grid items-stretch gap-px border border-line bg-line lg:grid-cols-[1fr_minmax(0,0.85fr)]">
+          <div className="grid items-stretch gap-px border border-line bg-line lg:grid-cols-[1fr_minmax(0,0.85fr)]">
             <div className="flex flex-col justify-center gap-5 bg-panel p-7 sm:p-10">
               <Glyph d="M4 4 H14 V14 H4 Z M10 10 H20 V20 H10 Z" className="h-7 w-7 text-signal-soft" />
               <h3 className="font-display text-[clamp(1.75rem,4vw,2.75rem)] font-bold leading-tight text-ink">
                 Align handheld shots without a tripod.
               </h3>
               <p className="prose-pretty text-[15px] leading-relaxed text-ink-2">
-                On-device registration locks the static background sharp while moving subjects
-                keep their blur. Drag the divider on a real shot — same 67 frames, Align off
-                versus on.
+                On-device registration locks the static background sharp while your moving subject
+                keeps its blur. Drag the divider below to compare: same frames, Align off on the
+                left, on the right.
               </p>
             </div>
             <div className="bg-panel p-3 sm:p-4">
@@ -529,30 +427,28 @@ export function LandingPage() {
                 afterLabel="Align on"
               />
             </div>
-          </Rise>
+          </div>
 
-          <Rise className="[&>div]:border-t-0">
+          <div className="[&>div]:border-t-0">
             <ModeSwitch />
-          </Rise>
+          </div>
 
           <div className="mt-px grid gap-px border border-t-0 border-line bg-line lg:grid-cols-4">
             {[
-              { name: "Smooth motion", icon: "M4 16 C8 16 8 8 12 8 C16 8 16 16 20 16 M4 12 C8 12 8 6 12 6 M12 18 C16 18 16 12 20 12", body: "Optical flow fills the gaps between frames, so fast subjects streak in one continuous trail instead of leaving discrete ghost copies." },
+              { name: "Smooth motion", icon: "M4 16 C8 16 8 8 12 8 C16 8 16 16 20 16 M4 12 C8 12 8 6 12 6 M12 18 C16 18 16 12 20 12", body: "Optical flow fills the gaps between frames, so fast subjects blur into one continuous trail instead of leaving separate ghost frames." },
               { name: "Match exposure", icon: "M12 7 a5 5 0 1 0 0 10 a5 5 0 1 0 0 -10 M12 2 V4 M12 20 V22 M2 12 H4 M20 12 H22", body: "Evens out the brightness flicker the camera bakes in between frames, so the blend stays clean instead of pulsing." },
-              { name: "Hold to compare", icon: "M12 4 V20 M4 6 H10 V18 H4 Z M14 6 H20 V18 H14 Z", body: "Press the preview to flip to a single sharp frame and see exactly what the exposure added." },
-              { name: "Time-lapse video", icon: "M4 5 H20 V19 H4 Z M10 9.5 L15 12 L10 14.5 Z M4 15.5 H20", body: "Export a shareable time-lapse of the exposure assembling itself" },
-            ].map((f, i) => (
-              <Rise key={f.name} style={{ transitionDelay: `${i * 70}ms` }}>
-                <div className="flex h-full flex-col gap-5 bg-panel p-7 sm:p-8">
-                  <Glyph d={f.icon} className="h-7 w-7 text-signal-soft" />
-                  <h3 className="font-display text-2xl font-bold text-ink">{f.name}</h3>
-                  <p className="text-[15px] leading-relaxed text-ink-2">{f.body}</p>
-                </div>
-              </Rise>
+              { name: "Hold to compare", icon: "M12 4 V20 M4 6 H10 V18 H4 Z M14 6 H20 V18 H14 Z", body: "Press the preview to flip to a single sharp frame and see what the exposure added." },
+              { name: "Time-lapse video", icon: "M4 5 H20 V19 H4 Z M10 9.5 L15 12 L10 14.5 Z M4 15.5 H20", body: "Export a time-lapse of the exposure building up, frame by frame." },
+            ].map((f) => (
+              <div key={f.name} className="flex h-full flex-col gap-5 bg-panel p-7 sm:p-8">
+                <Glyph d={f.icon} className="h-7 w-7 text-signal-soft" />
+                <h3 className="font-display text-2xl font-bold text-ink">{f.name}</h3>
+                <p className="text-[15px] leading-relaxed text-ink-2">{f.body}</p>
+              </div>
             ))}
           </div>
 
-          <Rise className="mt-px border border-t-0 border-line bg-line">
+          <div className="mt-px border border-t-0 border-line bg-line">
             <div className="grid gap-px lg:grid-cols-[1fr_minmax(0,0.8fr)]">
               <div className="flex flex-col justify-center gap-4 bg-panel p-7 sm:p-10">
                 <Mono className="text-ink-3">In-app capture</Mono>
@@ -561,7 +457,7 @@ export function LandingPage() {
                 </h3>
                 <p className="prose-pretty text-[15px] leading-relaxed text-ink-2">
                   Record inside the app with exposure and white balance pinned, so every frame
-                  matches before they ever blend. The cleanest possible source — no flicker to fix.
+                  matches before they blend. The cleanest source you can get, no flicker to fix.
                 </p>
               </div>
 
@@ -585,24 +481,24 @@ export function LandingPage() {
                 </dl>
               </div>
             </div>
-          </Rise>
+          </div>
         </section>
 
         {/* get */}
         <section id="get" className="mx-auto max-w-7xl px-5 py-28 sm:px-8 md:py-40">
-          <Rise className="flex flex-col items-start gap-8 border-t border-line pt-16 md:flex-row md:items-end md:justify-between">
+          <div className="flex flex-col items-start gap-8 border-t border-line pt-16 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="font-display text-[clamp(2.75rem,8vw,6rem)] font-extrabold leading-[0.9] text-ink">
-                Make the shot
+                Take the shot
                 <br />
                 you couldn't take.
               </h2>
               <p className="prose-pretty mt-6 text-[16px] leading-relaxed text-ink-2">
-                Free to try, with the Live Photos already in your library. iPhone · iOS 17 and up.
+                Free to try. Use the Live Photos already in your library. iPhone, iOS 17 and up.
               </p>
             </div>
             <AppStoreBadge size="large" />
-          </Rise>
+          </div>
         </section>
 
         <footer className="border-t border-line">
@@ -619,10 +515,6 @@ export function LandingPage() {
           </div>
         </footer>
       </main>
-
-      <style>{`
-        @keyframes fadeKey { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
     </div>
   );
 }

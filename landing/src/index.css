@@ -49,29 +49,6 @@ body {
   max-width: 68ch;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .rise.arm {
-    opacity: 0;
-    transform: translateY(14px);
-    transition:
-      opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
-      transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
-    will-change: transform, opacity;
-  }
-  .rise.arm.in {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  .wipe.arm {
-    clip-path: inset(0 100% 0 0);
-    transition: clip-path 800ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  .wipe.arm.in {
-    clip-path: inset(0 0 0 0);
-  }
-}
-
 .grain::after {
   content: "";
   position: fixed;
